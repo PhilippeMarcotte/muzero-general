@@ -21,8 +21,8 @@ class MuZeroConfig:
 
         ### Self-Play
         self.num_actors = 1  # Number of simultaneous threads self-playing to feed the replay buffer
-        self.max_moves = 10000  # Maximum number of moves if game is not finished before
-        self.num_simulations = 100  # Number of future moves self-simulated
+        self.max_moves = 27000  # Maximum number of moves if game is not finished before
+        self.num_simulations = 50  # Number of future moves self-simulated
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = 10000  # Number of moves before dropping temperature to 0 (ie playing according to the max)
         self.self_play_delay = 0  # Number of seconds to wait after each played game to adjust the self play / training ratio to avoid over/underfitting
@@ -59,12 +59,12 @@ class MuZeroConfig:
         self.results_path = os.path.join(os.path.dirname(__file__), "../results", os.path.basename(__file__)[:-3],
                                          datetime.datetime.now().strftime(
                                              "%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
-        self.training_steps = 5000  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 128  # Number of parts of games to train on at each training step
-        self.num_unroll_steps = 10  # Number of game moves to keep for every batch element
-        self.checkpoint_interval = 10  # Number of training steps before using the model for sef-playing
-        self.window_size = 1000  # Number of self-play games to keep in the replay buffer
-        self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
+        self.training_steps = 1000e3  # Total number of training steps (ie weights update according to a batch)
+        self.batch_size = 1024  # Number of parts of games to train on at each training step
+        self.num_unroll_steps = 5  # Number of game moves to keep for every batch element
+        self.checkpoint_interval = 1e3  # Number of training steps before using the model for sef-playing
+        self.window_size = 1e6  # Number of self-play games to keep in the replay buffer
+        self.td_steps = 10  # Number of steps in the future to take into account for calculating the target value
         self.training_delay = 0  # Number of seconds to wait after each training to adjust the self play / training ratio to avoid over/underfitting
         self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.training_device = "cuda" if torch.cuda.is_available() else "cpu"  # Train on GPU if available
@@ -74,13 +74,13 @@ class MuZeroConfig:
 
         # Exponential learning rate schedule
         self.lr_init = 0.05  # Initial learning rate
-        self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
-        self.lr_decay_steps = 1000
+        self.lr_decay_rate = 0.1  # Set it to 1 to use a constant learning rate
+        self.lr_decay_steps = 350e3
 
         ### Test
         self.test_episodes = 2  # Number of games rendered when calling the MuZero test method
 
-    def visit_softmax_temperature_fn(self, trained_steps):
+    def visit_softmax_temperature_fn(self, training_steps):
         """
         Parameter to alter the visit count distribution to ensure that the action selection becomes greedier as training progresses.
         The smaller it is, the more likely the best action (ie with the highest visit count) is chosen.
@@ -88,9 +88,9 @@ class MuZeroConfig:
         Returns:
             Positive float.
         """
-        if trained_steps < 0.5 * self.training_steps:
+        if training_steps < 500e3:
             return 1.0
-        elif trained_steps < 0.75 * self.training_steps:
+        elif training_steps < 750e3:
             return 0.5
         else:
             return 0.25
@@ -102,7 +102,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        self.env = gym.make("SpaceInvadersRam-v0")
+        self.env = gym.make("SpaceInvaders-ram-v0")
         if seed is not None:
             self.env.seed(seed)
 
