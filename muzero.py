@@ -1,18 +1,21 @@
+from comet_ml import Experiment
+from utils.logging import CometMLLogger, Logger, TensorboardLogger
 import copy
 import importlib
 import os
 import time
 
+import fire
 import numpy
 import ray
 import torch
-from torch.utils.tensorboard import SummaryWriter
 
 import models
 import replay_buffer
 import self_play
 import shared_storage
 import trainer
+from utils.config import load_toml
 
 
 class MuZero:
@@ -45,17 +48,16 @@ class MuZero:
             )
             raise err
 
-        # Fix random generator seed
+        # Fix random generator seed for reproductibility
         numpy.random.seed(self.config.seed)
         torch.manual_seed(self.config.seed)
 
         # Weights used to initialize components
         self.muzero_weights = models.MuZeroNetwork(self.config).get_weights()
 
-    def train(self):
+    def train(self, writer: Logger):
         ray.init()
         os.makedirs(self.config.results_path, exist_ok=True)
-        writer = SummaryWriter(self.config.results_path)
 
         # Initialize workers
         training_worker = trainer.Trainer.options(
@@ -91,9 +93,7 @@ class MuZero:
             replay_buffer_worker, shared_storage_worker
         )
 
-        print(
-            "\nTraining...\nRun tensorboard --logdir ./results and go to http://localhost:6006/ to see in real time the training performance.\n"
-        )
+
         # Save hyperparameters to TensorBoard
         hp_table = [
             "| {} | {} |".format(key, value)
@@ -143,8 +143,8 @@ class MuZero:
                 writer.add_scalar("3.Loss/Reward loss", infos["reward_loss"], counter)
                 writer.add_scalar("3.Loss/Policy loss", infos["policy_loss"], counter)
                 print(
-                    "Last test reward: {0:.2f}. Training step: {1}/{2}. Played games: {3}. Loss: {4:.2f}".format(
-                        infos["total_reward"],
+                    "MuZero test reward: {0:.2f}. Training step: {1}/{2}. Played games: {3}. Loss: {4:.2f}".format(
+                        infos["player_0_reward"],
                         infos["training_step"],
                         self.config.training_steps,
                         ray.get(replay_buffer_worker.get_self_play_count.remote()),
@@ -203,7 +203,8 @@ class MuZero:
             print("\nThere is no model saved in {}.".format(path))
 
 
-if __name__ == "__main__":
+def main(logger="comet_ml", config_path="./configs/config.toml"):
+    config = load_toml(config_path)
     print("\nWelcome to MuZero! Here's a list of games:")
     # Let user pick a game
     games = [
@@ -218,10 +219,13 @@ if __name__ == "__main__":
     while choice not in valid_inputs:
         choice = input("Invalid input, enter a number listed above: ")
 
-    # Initialize MuZero
+    # Initialize MuZero0
     choice = int(choice)
     muzero = MuZero(games[choice])
-
+    if logger == "comet_ml":
+        logger = CometMLLogger(config)
+    else:
+        logger = TensorboardLogger(muzero.config)
     while True:
         # Configure running options
         options = [
@@ -241,7 +245,7 @@ if __name__ == "__main__":
             choice = input("Invalid input, enter a number listed above: ")
         choice = int(choice)
         if choice == 0:
-            muzero.train()
+            muzero.train(logger)
         elif choice == 1:
             path = input("Enter a path to the model.weights: ")
             while not os.path.isfile(path):
@@ -255,9 +259,6 @@ if __name__ == "__main__":
             break
         print("\nDone")
 
-    ## Successive training, create a new config file for each experiment
-    # experiments = ["cartpole", "tictactoe"]
-    # for experiment in experiments:
-    #     print("\nStarting experiment {}".format(experiment))
-    #     muzero = MuZero(experiment)
-    #     muzero.train()
+
+if __name__ == "__main__":
+    fire.Fire(main)
