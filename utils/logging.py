@@ -35,10 +35,10 @@ class WandbLogger(Logger):
     def __init__(self, config):
         super().__init__(config)
         self.writer = wandb
-        wandb.init(project=config.wandb.project_name)
+        wandb.init(project=config.wandb.project_name, entity=config.wandb.entity)
 
     def add_scalar(self, tag, scalar_value, global_step=None, walltime=None):
-        self.writer.log(row={tag:scalar_value}, commit=None, step=global_step, sync=True)
+        self.writer.log(row={tag: scalar_value}, commit=None, step=global_step, sync=True)
 
     def add_text(self, tag, text_string, global_step=None, walltime=None):
         pass
