@@ -1,3 +1,4 @@
 [wandb]
 project_name = "rl-project"
 entity = "lap1n"
+group = "test"
