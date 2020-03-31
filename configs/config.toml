@@ -1,3 +1,2 @@
-[comet_ml]
+[wandb]
 project_name = "rl-project"
-api_key = "TAOEZkbwnavYnudi3hA9VxBfU"

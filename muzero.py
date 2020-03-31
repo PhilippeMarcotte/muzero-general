@@ -1,5 +1,5 @@
-from comet_ml import Experiment
-from utils.logging import CometMLLogger, Logger, TensorboardLogger
+import wandb
+from utils.logging import Logger, TensorboardLogger, WandbLogger
 import copy
 import importlib
 import os
@@ -203,7 +203,7 @@ class MuZero:
             print("\nThere is no model saved in {}.".format(path))
 
 
-def main(logger="comet_ml", config_path="./configs/config.toml"):
+def main(logger="wandb", config_path="./configs/config.toml"):
     config = load_toml(config_path)
     print("\nWelcome to MuZero! Here's a list of games:")
     # Let user pick a game
@@ -222,8 +222,8 @@ def main(logger="comet_ml", config_path="./configs/config.toml"):
     # Initialize MuZero0
     choice = int(choice)
     muzero = MuZero(games[choice])
-    if logger == "comet_ml":
-        logger = CometMLLogger(config)
+    if logger == "wandb":
+        logger = WandbLogger(config)
     else:
         logger = TensorboardLogger(muzero.config)
     while True:
