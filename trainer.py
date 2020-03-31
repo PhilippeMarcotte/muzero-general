@@ -1,9 +1,6 @@
 import time
-
-import numpy
 import ray
 import torch
-
 import models
 
 

@@ -1,6 +1,6 @@
 from abc import ABC
 
-from comet_ml import Experiment
+import wandb
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -31,13 +31,14 @@ class TensorboardLogger(Logger):
         self.writer.add_text(tag, text_string, global_step=None, walltime=None)
 
 
-class CometMLLogger(Logger):
+class WandbLogger(Logger):
     def __init__(self, config):
         super().__init__(config)
-        self.writer = Experiment(project_name=config.comet_ml.project_name, api_key=config.comet_ml.api_key)
+        self.writer = wandb
+        wandb.init(project=config.wandb.project_name)
 
     def add_scalar(self, tag, scalar_value, global_step=None, walltime=None):
-        self.writer.log_metric(name=tag, value=scalar_value, step=global_step, epoch=None)
+        self.writer.log(row={tag:scalar_value}, commit=None, step=global_step, sync=True)
 
     def add_text(self, tag, text_string, global_step=None, walltime=None):
         pass
