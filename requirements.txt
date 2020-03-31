@@ -9,3 +9,7 @@ psutil
 setproctitle
 aiohttp
 grpcio
+toml
+munch
+fire
+wandb
