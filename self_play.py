@@ -423,17 +423,25 @@ class GameHistory:
         self.child_visits = []
         self.root_values = []
 
-    def store_search_statistics(self, root, action_space):
+    def store_search_statistics(self, root, action_space, idx=None):
         # Turn visit count from root into a policy
         sum_visits = sum(child.visit_count for child in root.children.values())
-        self.child_visits.append(
-            [
-                root.children[a].visit_count / sum_visits if a in root.children else 0
-                for a in action_space
-            ]
-        )
+        if idx is None:
+            self.child_visits.append(
+                [
+                    root.children[a].visit_count / sum_visits if a in root.children else 0
+                    for a in action_space
+                ]
+            )
 
-        self.root_values.append(root.value())
+            self.root_values.append(root.value())
+        else:
+            self.child_visits[idx] = [
+                    root.children[a].visit_count / sum_visits if a in root.children else 0
+                    for a in action_space
+                ]
+
+            self.root_values[idx] = root.value()
 
 
 class MinMaxStats:
