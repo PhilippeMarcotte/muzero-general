@@ -64,7 +64,7 @@ class MuZero:
         shared_storage_worker = shared_storage.SharedStorage.remote(
             copy.deepcopy(self.muzero_weights), self.game_name, self.config,
         )
-        replay_buffer_worker = replay_buffer.ReplayBuffer.remote(self.config)
+        replay_buffer_worker = replay_buffer.ReplayBuffer.remote(self.config, self.Game(self.config.seed))
         self_play_workers = [
             self_play.SelfPlay.remote(
                 copy.deepcopy(self.muzero_weights),
