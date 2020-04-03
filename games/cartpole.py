@@ -78,6 +78,8 @@ class MuZeroConfig:
         self.lr_decay_rate = 0.9  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
 
+        # Muzero Reanalyze
+        self.reanalyze_mode = True
 
         ### Test
         self.test_episodes = 2  # Number of games rendered when calling the MuZero test method
