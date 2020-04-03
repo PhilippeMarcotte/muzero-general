@@ -101,7 +101,8 @@ class ReplayBuffer:
                             .unsqueeze(0)
                             .to(next(target_network.parameters()).device)
                     )
-                    value = target_network.initial_inference(obs).value.cpu().item()
+                    value, _, _, _ = target_network.initial_inference(obs)
+                    value = MCTS.support_to_scalar(value, self.config.support_size).cpu().item()
 
                 value = value * self.config.discount ** self.config.td_steps
 
@@ -123,9 +124,10 @@ class ReplayBuffer:
                 target_rewards.append(game_history.reward_history[current_index])
 
                 if target_network is not None and numpy.random.random() <= 0.8:
-                    obs = game_history.observation_history[current_index]
-                    root = MCTS(self.config).run(target_network, obs, self.game.legal_actions(), self.game.to_play(), False)
-                    game_history.store_search_statistics(root, self.config.action_space, current_index)
+                    with torch.no_grad():
+                        obs = game_history.observation_history[current_index]
+                        root = MCTS(self.config).run(target_network, obs, self.game.legal_actions(), self.game.to_play(), False)
+                        game_history.store_search_statistics(root, self.config.action_space, current_index)
 
                 target_policies.append(game_history.child_visits[current_index])
                 actions.append(game_history.action_history[current_index])
