@@ -79,6 +79,8 @@ class MuZeroConfig:
         self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 10000
 
+        # Muzero Reanalyze
+        self.reanalyze_mode = False
 
         ### Replay Buffer
         self.window_size = 3000  # Number of self-play games to keep in the replay buffer
