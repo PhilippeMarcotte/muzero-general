@@ -35,7 +35,7 @@ class Trainer:
 
         # Training loop
         while True:
-            batch = ray.get(replay_buffer.get_batch.remote())
+            batch = ray.get(replay_buffer.get_batch.remote(target_network_weights=self.model.get_weights()))
             self.update_lr()
             total_loss, value_loss, reward_loss, policy_loss = self.update_weights(
                 batch
