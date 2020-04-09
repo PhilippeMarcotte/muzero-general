@@ -13,20 +13,21 @@ class MuZeroConfig:
         self.seed = 0  # Seed for numpy, torch and the game
 
 
+
         ### Game
-        self.observation_shape = (3, 3, 3)  # Dimensions of the game observation, must be 3D. For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (3, 3, 3)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = [i for i in range(9)]  # Fixed list of all possible actions. You should only edit the length
         self.players = [i for i in range(2)]  # List of players. You should only edit the length
-        self.stacked_observations = 0  # Number of previous observation to add to the current observation
+        self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
+
 
 
         ### Self-Play
         self.num_actors = 1  # Number of simultaneous threads self-playing to feed the replay buffer
-        self.max_moves = 12  # Maximum number of moves if game is not finished before
+        self.max_moves = 9  # Maximum number of moves if game is not finished before
         self.num_simulations = 25  # Number of future moves self-simulated
         self.discount = 1  # Chronological discount of the reward
         self.temperature_threshold = 6  # Number of moves before dropping temperature to 0 (ie playing according to the max)
-        self.self_play_delay = 0  # Number of seconds to wait after each played game to adjust the self play / training ratio to avoid over/underfitting
 
         # Root prior exploration noise
         self.root_dirichlet_alpha = 0.1
@@ -37,11 +38,13 @@ class MuZeroConfig:
         self.pb_c_init = 1.25
 
 
+
         ### Network
         self.network = "resnet"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size
 
         # Residual Network
+        self.downsample = False  # Downsample observations before representation network (See paper appendix Network Architecture)
         self.blocks = 1  # Number of blocks in the ResNet
         self.channels = 16  # Number of channels in the ResNet
         self.reduced_channels = 16  # Number of channels before heads of dynamic and prediction networks
@@ -58,20 +61,18 @@ class MuZeroConfig:
         self.fc_dynamics_layers = [16]  # Define the hidden layers in the dynamics network
 
 
+
         ### Training
         self.results_path = os.path.join(os.path.dirname(__file__), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
         self.training_steps = 100000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 64  # Number of parts of games to train on at each training step
-        self.num_unroll_steps = 20  # Number of game moves to keep for every batch element
         self.checkpoint_interval = 10  # Number of training steps before using the model for sef-playing
-        self.window_size = 3000  # Number of self-play games to keep in the replay buffer
-        self.td_steps = 20  # Number of steps in the future to take into account for calculating the target value
-        self.training_delay = 0  # Number of seconds to wait after each training to adjust the self play / training ratio to avoid over/underfitting
-        self.value_loss_weight = 0.7  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.training_device = "cuda" if torch.cuda.is_available() else "cpu"  # Train on GPU if available
 
+        self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
-        self.momentum = 0.9
+        self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
         self.lr_init = 0.01  # Initial learning rate
@@ -79,10 +80,26 @@ class MuZeroConfig:
         self.lr_decay_steps = 10000
 
         # Muzero Reanalyze
-        self.reanalyze_mode = False
+        self.policy_update_rate = 0.8
 
-        ### Test
-        self.test_episodes = 2  # Number of games rendered when calling the MuZero test method
+        ### Replay Buffer
+        self.window_size = 3000  # Number of self-play games to keep in the replay buffer
+        self.num_unroll_steps = 20  # Number of game moves to keep for every batch element
+        self.td_steps = 20  # Number of steps in the future to take into account for calculating the target value
+        self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+
+        # Prioritized Replay (See paper appendix Training)
+        self.PER = True  # Select in priority the elements in the replay buffer which are unexpected for the network
+        self.use_max_priority = False  # Use the n-step TD error as initial priority. Better for large replay buffer
+        self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
+        self.PER_beta = 1.0
+
+
+
+        ### Adjust the self play / training ratio to avoid over/underfitting
+        self.self_play_delay = 0  # Number of seconds to wait after each played game
+        self.training_delay = 0  # Number of seconds to wait after each training step
+        self.ratio = None  # Desired self played games per training step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
 
 
     def visit_softmax_temperature_fn(self, trained_steps):
@@ -115,7 +132,7 @@ class Game(AbstractGame):
             The new observation, the reward and a boolean if the game has ended.
         """
         observation, reward, done = self.env.step(action)
-        return observation, reward*20, done
+        return observation, reward * 20, done
 
     def to_play(self):
         """
@@ -164,7 +181,7 @@ class Game(AbstractGame):
     def encode_board(self):
         return self.env.encode_board()
 
-    def human_action(self):
+    def human_to_action(self):
         """
         For multiplayer games, ask the user for a legal action
         and return the corresponding action number.
@@ -172,14 +189,37 @@ class Game(AbstractGame):
         Returns:
             An integer from the action space.
         """
-        choice = input(
-            "Enter the column to play for the player {}: ".format(self.to_play())
-        )
-        while choice not in [str(action) for action in self.legal_actions()]:
-            choice = input("Enter another column : ")
-        return int(choice)
+        while True:
+            try:
+                row = int(
+                    input(
+                        "Enter the row (1, 2 or 3) to play for the player {}: ".format(
+                            self.to_play()
+                        )
+                    )
+                )
+                col = int(
+                    input(
+                        "Enter the column (1, 2 or 3) to play for the player {}: ".format(
+                            self.to_play()
+                        )
+                    )
+                )
+                choice = (row - 1) * 3 + (col - 1)
+                if (
+                    choice in self.legal_actions()
+                    and 1 <= row
+                    and 1 <= col
+                    and row <= 3
+                    and col <= 3
+                ):
+                    break
+            except:
+                pass
+            print("Wrong input, try again")
+        return choice
 
-    def print_action(self, action_number):
+    def action_to_string(self, action_number):
         """
         Convert an action number to a string representing the action.
         
@@ -189,7 +229,9 @@ class Game(AbstractGame):
         Returns:
             String representing the action.
         """
-        return "Play column {}".format(action_number + 1)
+        row = 3 - action_number // 3
+        col = action_number % 3 + 1
+        return "Play row {}, column {}".format(row, col)
 
 
 class TicTacToe:

@@ -15,7 +15,9 @@ import replay_buffer
 import self_play
 import shared_storage
 import trainer
+import reanalyze
 from utils.config import load_toml
+from utils.logging import WandbLogger, TensorboardLogger
 
 
 class MuZero:
@@ -29,7 +31,7 @@ class MuZero:
     Example:
         >>> muzero = MuZero("cartpole")
         >>> muzero.train()
-        >>> muzero.test()
+        >>> muzero.test(render=True, opponent="self", muzero_player=None)
     """
 
     def __init__(self, game_name):
@@ -66,7 +68,7 @@ class MuZero:
         shared_storage_worker = shared_storage.SharedStorage.remote(
             copy.deepcopy(self.muzero_weights), self.game_name, self.config,
         )
-        replay_buffer_worker = replay_buffer.ReplayBuffer.remote(self.config, self.Game(self.config.seed))
+        replay_buffer_worker = replay_buffer.ReplayBuffer.remote(self.config, shared_storage_worker)
         self_play_workers = [
             self_play.SelfPlay.remote(
                 copy.deepcopy(self.muzero_weights),
@@ -80,6 +82,14 @@ class MuZero:
             self.Game(self.config.seed + self.config.num_actors),
             self.config,
         )
+        if self.config.policy_update_rate > 0:
+            reanalyze_worker = reanalyze.ReanalyzeWorker.remote(
+                copy.deepcopy(self.muzero_weights),
+                shared_storage_worker,
+                replay_buffer_worker,
+                self.config
+            )
+            reanalyze_worker.update_policies.remote()
 
         # Launch workers
         [
@@ -92,7 +102,6 @@ class MuZero:
         training_worker.continuous_update_weights.remote(
             replay_buffer_worker, shared_storage_worker
         )
-
 
         # Save hyperparameters to TensorBoard
         hp_table = [
@@ -114,12 +123,15 @@ class MuZero:
                     "1.Total reward/1.Total reward", infos["total_reward"], counter,
                 )
                 writer.add_scalar(
-                    "1.Total reward/2.Player 0 MuZero reward",
+                    "1.Total reward/2.Episode length", infos["episode_length"], counter,
+                )
+                writer.add_scalar(
+                    "1.Total reward/3.Player 0 MuZero reward",
                     infos["player_0_reward"],
                     counter,
                 )
                 writer.add_scalar(
-                    "1.Total reward/3.Player 1 Random reward",
+                    "1.Total reward/4.Player 1 Random reward",
                     infos["player_1_reward"],
                     counter,
                 )
@@ -138,13 +150,15 @@ class MuZero:
                     counter,
                 )
                 writer.add_scalar("2.Workers/4.Learning rate", infos["lr"], counter)
-                writer.add_scalar("3.Loss/1.Total loss", infos["total_loss"], counter)
+                writer.add_scalar(
+                    "3.Loss/1.Total weighted loss", infos["total_loss"], counter
+                )
                 writer.add_scalar("3.Loss/Value loss", infos["value_loss"], counter)
                 writer.add_scalar("3.Loss/Reward loss", infos["reward_loss"], counter)
                 writer.add_scalar("3.Loss/Policy loss", infos["policy_loss"], counter)
                 print(
-                    "MuZero test reward: {0:.2f}. Training step: {1}/{2}. Played games: {3}. Loss: {4:.2f}".format(
-                        infos["player_0_reward"],
+                    "Last test reward: {0:.2f}. Training step: {1}/{2}. Played games: {3}. Loss: {4:.2f}".format(
+                        infos["total_reward"],
                         infos["training_step"],
                         self.config.training_steps,
                         ray.get(replay_buffer_worker.get_self_play_count.remote()),
@@ -158,7 +172,7 @@ class MuZero:
             # Comment the line below to be able to stop the training but keep running
             # raise err
             pass
-        self.muzero_weights = ray.get(shared_storage_worker.get_weights.remote())
+        self.muzero_weights = ray.get(shared_storage_worker.get_target_network_weights.remote())
         # End running actors
         ray.shutdown()
 
@@ -182,16 +196,11 @@ class MuZero:
             self.Game(self.config.seed + self.config.num_actors),
             self.config,
         )
-        test_rewards = []
-        for _ in range(self.config.test_episodes):
-            history = ray.get(
-                self_play_workers.play_game.remote(
-                    0, 0, render, opponent, muzero_player
-                )
-            )
-            test_rewards.append(sum(history.reward_history))
+        history = ray.get(
+            self_play_workers.play_game.remote(0, 0, render, opponent, muzero_player)
+        )
         ray.shutdown()
-        return test_rewards
+        return sum(history.reward_history)
 
     def load_model(self, path=None):
         if not path:
@@ -219,7 +228,7 @@ def main(logger="wandb", config_path="./configs/config.toml"):
     while choice not in valid_inputs:
         choice = input("Invalid input, enter a number listed above: ")
 
-    # Initialize MuZero0
+    # Initialize MuZero
     choice = int(choice)
     muzero = MuZero(games[choice])
     if logger == "wandb":
@@ -258,6 +267,16 @@ def main(logger="wandb", config_path="./configs/config.toml"):
         else:
             break
         print("\nDone")
+
+    ## Successive training, create a new config file for each experiment
+    # experiments = ["cartpole", "tictactoe"]
+    # for experiment in experiments:
+    #     print("\nStarting experiment {}".format(experiment))
+    #     try:
+    #         muzero = MuZero(experiment)
+    #         muzero.train()
+    #     except:
+    #         print("Skipping {}, an error has occurred.".format(experiment))
 
 
 if __name__ == "__main__":

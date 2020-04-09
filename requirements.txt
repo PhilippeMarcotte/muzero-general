@@ -13,3 +13,5 @@ toml
 munch
 fire
 wandb
+
+grpcio==1.27.2

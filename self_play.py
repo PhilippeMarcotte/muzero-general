@@ -19,6 +19,10 @@ class SelfPlay:
         self.config = config
         self.game = game
 
+        # Fix random generator seed
+        numpy.random.seed(self.config.seed)
+        torch.manual_seed(self.config.seed)
+
         # Initialize the network
         self.model = models.MuZeroNetwork(self.config)
         self.model.set_weights(initial_weights)
@@ -28,7 +32,7 @@ class SelfPlay:
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
         while True:
             self.model.set_weights(
-                copy.deepcopy(ray.get(shared_storage.get_weights.remote()))
+                copy.deepcopy(ray.get(shared_storage.get_target_network_weights.remote()))
             )
 
             # Take the best action (no exploration) in test mode
@@ -54,6 +58,9 @@ class SelfPlay:
                 shared_storage.set_infos.remote(
                     "total_reward", sum(game_history.reward_history)
                 )
+                shared_storage.set_infos.remote(
+                    "episode_length", len(game_history.action_history)
+                )
                 if 1 < len(self.config.players):
                     shared_storage.set_infos.remote(
                         "player_0_reward",
@@ -78,24 +85,32 @@ class SelfPlay:
             if not test_mode:
                 replay_buffer.save_game.remote(game_history)
 
+            # Managing the self-play / training ratio
             if not test_mode and self.config.self_play_delay:
                 time.sleep(self.config.self_play_delay)
+            if not test_mode and self.config.ratio:
+                while (
+                        ray.get(replay_buffer.get_self_play_count.remote())
+                        / max(
+                    1, ray.get(shared_storage.get_infos.remote())["training_step"]
+                )
+                        > self.config.ratio
+                ):
+                    time.sleep(0.5)
 
     def play_game(
-        self, temperature, temperature_threshold, render, opponent, muzero_player
+            self, temperature, temperature_threshold, render, opponent, muzero_player
     ):
         """
         Play one game with actions based on the Monte Carlo tree search at each moves.
         """
         game_history = GameHistory()
         observation = self.game.reset()
-        observation = self.stack_previous_observations(
-            observation, game_history, self.config.stacked_observations
-        )
         game_history.action_history.append(0)
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
+        game_history.legal_actions.append(self.game.legal_actions())
 
         done = False
 
@@ -104,32 +119,45 @@ class SelfPlay:
 
         with torch.no_grad():
             while (
-                not done and len(game_history.action_history) <= self.config.max_moves
+                    not done and len(game_history.action_history) <= self.config.max_moves
             ):
-                root = MCTS(self.config).run(
+                stacked_observations = game_history.get_stacked_observations(
+                    -1, self.config.stacked_observations,
+                )
+
+                root, priority, tree_depth = MCTS(self.config).run(
                     self.model,
-                    observation,
+                    stacked_observations,
                     self.game.legal_actions(),
                     self.game.to_play(),
                     False if temperature == 0 else True,
                 )
+
+                if render:
+                    print("Tree depth: {}".format(tree_depth))
+                    print(
+                        "Root value for player {0}: {1:.2f}".format(
+                            self.game.to_play(), root.value()
+                        )
+                    )
 
                 # Choose the action
                 if opponent == "self" or muzero_player == self.game.to_play():
                     action = self.select_action(
                         root,
                         temperature
-                        if len(game_history.action_history) < temperature_threshold
+                        if not temperature_threshold
+                           or len(game_history.action_history) < temperature_threshold
                         else 0,
                     )
                 elif opponent == "human":
                     print(
                         "Player {} turn. MuZero suggests {}".format(
                             self.game.to_play(),
-                            self.game.print_action(self.select_action(root, 0)),
+                            self.game.action_to_string(self.select_action(root, 0)),
                         )
                     )
-                    action = self.game.human_action()
+                    action = self.game.human_to_action()
                 elif opponent == "random":
                     action = numpy.random.choice(self.game.legal_actions())
                 else:
@@ -139,55 +167,23 @@ class SelfPlay:
 
                 observation, reward, done = self.game.step(action)
 
-                observation = self.stack_previous_observations(
-                    observation, game_history, self.config.stacked_observations,
-                )
-
                 if render:
-                    print("Played action: {}".format(self.game.print_action(action)))
+                    print(
+                        "Played action: {}".format(self.game.action_to_string(action))
+                    )
                     self.game.render()
 
                 game_history.store_search_statistics(root, self.config.action_space)
+                game_history.priorities.append(priority)
 
                 # Next batch
                 game_history.action_history.append(action)
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
                 game_history.to_play_history.append(self.game.to_play())
-
+                game_history.legal_actions.append(self.game.legal_actions())
         self.game.close()
         return game_history
-
-    @staticmethod
-    def stack_previous_observations(
-        observation, game_history, num_stacked_observations
-    ):
-        stacked_observations = observation.copy()
-        for i in range(num_stacked_observations):
-            try:
-                previous_observation = numpy.concatenate(
-                    (
-                        game_history.observation_history[-i - 1][
-                            : observation.shape[0]
-                        ],
-                        [
-                            numpy.ones_like(observation[0])
-                            * game_history.action_history[-i - 1]
-                        ],
-                    ),
-                    axis=0,
-                )
-            except IndexError:
-                previous_observation = numpy.concatenate(
-                    (numpy.zeros_like(observation), [numpy.zeros_like(observation[0])]),
-                    axis=0,
-                )
-
-            stacked_observations = numpy.concatenate(
-                (stacked_observations, previous_observation), axis=0
-            )
-
-        return stacked_observations
 
     @staticmethod
     def select_action(node, temperature):
@@ -237,12 +233,20 @@ class MCTS:
         root = Node(0)
         observation = (
             torch.tensor(observation)
-            .float()
-            .unsqueeze(0)
-            .to(next(model.parameters()).device)
+                .float()
+                .unsqueeze(0)
+                .to(next(model.parameters()).device)
         )
-        _, reward, policy_logits, hidden_state = model.initial_inference(observation)
-        reward = self.support_to_scalar(reward, self.config.support_size).item()
+        (
+            root_predicted_value,
+            reward,
+            policy_logits,
+            hidden_state,
+        ) = model.initial_inference(observation)
+        root_predicted_value = models.support_to_scalar(
+            root_predicted_value, self.config.support_size
+        ).item()
+        reward = models.support_to_scalar(reward, self.config.support_size).item()
         root.expand(
             legal_actions, to_play, reward, policy_logits, hidden_state,
         )
@@ -254,12 +258,15 @@ class MCTS:
 
         min_max_stats = MinMaxStats()
 
+        max_tree_depth = 0
         for _ in range(self.config.num_simulations):
             virtual_to_play = to_play
             node = root
             search_path = [node]
+            current_tree_depth = 0
 
             while node.expanded():
+                current_tree_depth += 1
                 action, node = self.select_child(node, min_max_stats)
                 search_path.append(node)
 
@@ -276,8 +283,8 @@ class MCTS:
                 parent.hidden_state,
                 torch.tensor([[action]]).to(parent.hidden_state.device),
             )
-            value = self.support_to_scalar(value, self.config.support_size).item()
-            reward = self.support_to_scalar(reward, self.config.support_size).item()
+            value = models.support_to_scalar(value, self.config.support_size).item()
+            reward = models.support_to_scalar(reward, self.config.support_size).item()
             node.expand(
                 self.config.action_space,
                 virtual_to_play,
@@ -286,11 +293,17 @@ class MCTS:
                 hidden_state,
             )
 
-            self.backpropagate(
-                search_path, value, virtual_to_play, min_max_stats
-            )
+            self.backpropagate(search_path, value, virtual_to_play, min_max_stats)
 
-        return root
+            max_tree_depth = max(max_tree_depth, current_tree_depth)
+
+        priority = (
+            None
+            if self.config.use_max_priority
+            else numpy.abs(root_predicted_value - root.value()) ** self.config.PER_alpha
+        )
+
+        return root, priority, max_tree_depth
 
     def select_child(self, node, min_max_stats):
         """
@@ -307,16 +320,17 @@ class MCTS:
         The score for a node is based on its value, plus an exploration bonus based on the prior.
         """
         pb_c = (
-            math.log(
-                (parent.visit_count + self.config.pb_c_base + 1) / self.config.pb_c_base
-            )
-            + self.config.pb_c_init
+                math.log(
+                    (parent.visit_count + self.config.pb_c_base + 1) / self.config.pb_c_base
+                )
+                + self.config.pb_c_init
         )
         pb_c *= math.sqrt(parent.visit_count) / (child.visit_count + 1)
 
         prior_score = pb_c * child.prior
 
         if child.visit_count > 0:
+            # Mean value Q
             value_score = min_max_stats.normalize(
                 child.reward + self.config.discount * child.value()
             )
@@ -333,33 +347,9 @@ class MCTS:
         for node in reversed(search_path):
             node.value_sum += value if node.to_play == to_play else -value
             node.visit_count += 1
-            min_max_stats.update(node.value())
+            min_max_stats.update(node.reward + self.config.discount * node.value())
 
             value = node.reward + self.config.discount * value
-
-    @staticmethod
-    def support_to_scalar(logits, support_size):
-        """
-        Transform a categorical representation to a scalar
-        See paper appendix Network Architecture
-        """
-        # Decode to a scalar
-        probabilities = torch.softmax(logits, dim=1)
-        support = (
-            torch.tensor([x for x in range(-support_size, support_size + 1)])
-            .expand(probabilities.shape)
-            .float()
-            .to(device=probabilities.device)
-        )
-        x = torch.sum(support * probabilities, dim=1, keepdim=True)
-
-        # Invert the scaling (defined in https://arxiv.org/abs/1805.11593)
-        x = torch.sign(x) * (
-            ((torch.sqrt(1 + 4 * 0.001 * (torch.abs(x) + 1 + 0.001)) - 1) / (2 * 0.001))
-            ** 2
-            - 1
-        )
-        return x
 
 
 class Node:
@@ -422,6 +412,8 @@ class GameHistory:
         self.to_play_history = []
         self.child_visits = []
         self.root_values = []
+        self.priorities = []
+        self.legal_actions = []
 
     def store_search_statistics(self, root, action_space, idx=None):
         # Turn visit count from root into a policy
@@ -442,6 +434,42 @@ class GameHistory:
                 ]
 
             self.root_values[idx] = root.value()
+
+    def get_stacked_observations(self, index, num_stacked_observations):
+        """
+        Generate a new observation with the observation at the index position
+        and num_stacked_observations past observations and actions stacked.
+        """
+        # Convert to positive index
+        index = index % len(self.observation_history)
+
+        stacked_observations = self.observation_history[index].copy()
+        for past_observation_index in reversed(
+                range(index - num_stacked_observations, index)
+        ):
+            if 0 <= past_observation_index:
+                previous_observation = numpy.concatenate(
+                    (
+                        self.observation_history[past_observation_index],
+                        [
+                            numpy.ones_like(stacked_observations[0])
+                            * self.action_history[past_observation_index + 1]
+                        ],
+                    )
+                )
+            else:
+                previous_observation = numpy.concatenate(
+                    (
+                        numpy.zeros_like(self.observation_history[index]),
+                        [numpy.zeros_like(stacked_observations[0])],
+                    )
+                )
+
+            stacked_observations = numpy.concatenate(
+                (stacked_observations, previous_observation)
+            )
+
+        return stacked_observations
 
 
 class MinMaxStats:
