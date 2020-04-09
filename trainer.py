@@ -2,6 +2,7 @@ import time
 import ray
 import torch
 import models
+import numpy
 
 
 @ray.remote
