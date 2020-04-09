@@ -53,7 +53,7 @@ class Trainer:
 
         # Training loop
         while True:
-            index_batch, batch = ray.get(replay_buffer.get_batch.remote(self.model.get_weights()))
+            index_batch, batch = ray.get(replay_buffer.get_batch.remote())
             self.update_lr()
             (
                 priorities,
@@ -69,7 +69,7 @@ class Trainer:
 
             # Save to the shared storage
             if self.training_step % self.config.checkpoint_interval == 0:
-                shared_storage_worker.set_weights.remote(self.model.get_weights())
+                shared_storage_worker.set_target_network_weights.remote(self.model.get_weights())
             shared_storage_worker.set_infos.remote("training_step", self.training_step)
             shared_storage_worker.set_infos.remote(
                 "lr", self.optimizer.param_groups[0]["lr"]
@@ -78,15 +78,15 @@ class Trainer:
             shared_storage_worker.set_infos.remote("value_loss", value_loss)
             shared_storage_worker.set_infos.remote("reward_loss", reward_loss)
             shared_storage_worker.set_infos.remote("policy_loss", policy_loss)
-
+            shared_storage_worker.set_network_weights.remote(self.model.get_weights())
             # Managing the self-play / training ratio
             if self.config.training_delay:
                 time.sleep(self.config.training_delay)
             if self.config.ratio:
                 while (
-                    ray.get(replay_buffer.get_self_play_count.remote())
-                    / max(1, self.training_step)
-                    < self.config.ratio
+                        ray.get(replay_buffer.get_self_play_count.remote())
+                        / max(1, self.training_step)
+                        < self.config.ratio
                 ):
                     time.sleep(0.5)
 
@@ -160,14 +160,14 @@ class Trainer:
         # Compute priorities for the prioritized replay (See paper appendix Training)
         pred_value_scalar = (
             models.support_to_scalar(value, self.config.support_size)
-            .detach()
-            .cpu()
-            .numpy()
-            .squeeze()
+                .detach()
+                .cpu()
+                .numpy()
+                .squeeze()
         )
         priorities[:, 0] = (
-            numpy.abs(pred_value_scalar - target_value_scalar[:, 0])
-            ** self.config.PER_alpha
+                numpy.abs(pred_value_scalar - target_value_scalar[:, 0])
+                ** self.config.PER_alpha
         )
 
         for i in range(1, len(predictions)):
@@ -203,14 +203,14 @@ class Trainer:
             # Compute priorities for the prioritized replay (See paper appendix Training)
             pred_value_scalar = (
                 models.support_to_scalar(value, self.config.support_size)
-                .detach()
-                .cpu()
-                .numpy()
-                .squeeze()
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .squeeze()
             )
             priorities[:, i] = (
-                numpy.abs(pred_value_scalar - target_value_scalar[:, i])
-                ** self.config.PER_alpha
+                    numpy.abs(pred_value_scalar - target_value_scalar[:, i])
+                    ** self.config.PER_alpha
             )
 
         # Scale the value loss, paper recommends by 0.25 (See paper appendix Reanalyze)
@@ -241,14 +241,14 @@ class Trainer:
         Update learning rate
         """
         lr = self.config.lr_init * self.config.lr_decay_rate ** (
-            self.training_step / self.config.lr_decay_steps
+                self.training_step / self.config.lr_decay_steps
         )
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr
 
     @staticmethod
     def loss_function(
-        value, reward, policy_logits, target_value, target_reward, target_policy,
+            value, reward, policy_logits, target_value, target_reward, target_policy,
     ):
         # Cross-entropy seems to have a better convergence than MSE
         value_loss = (-target_value * torch.nn.LogSoftmax(dim=1)(value)).sum(1)

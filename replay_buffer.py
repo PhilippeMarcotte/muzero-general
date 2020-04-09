@@ -18,14 +18,14 @@ class ReplayBuffer:
     Class which run in a dedicated thread to store played games and generate batch.
     """
 
-    def __init__(self, config, game):
+    def __init__(self, config, shared_storage):
         self.config = config
         self.buffer = {}
         self.game_priorities = collections.deque(maxlen=self.config.window_size)
         self.max_recorded_game_priority = 1.0
         self.self_play_count = 0
         self.total_samples = 0
-        self.game = game
+        self.shared_storage = shared_storage
 
         # Used only for the Reanalyze options
         self.model = (
@@ -60,7 +60,7 @@ class ReplayBuffer:
     def get_self_play_count(self):
         return self.self_play_count
 
-    def get_batch(self, model_weights):
+    def get_batch(self):
         (
             index_batch,
             observation_batch,
@@ -73,7 +73,7 @@ class ReplayBuffer:
         ) = ([], [], [], [], [], [], [], [])
 
         if self.config.use_last_model_value:
-            self.model.set_weights(model_weights)
+            self.model.set_weights(ray.get(self.shared_storage.get_target_network_weights.remote()))
 
         for _ in range(self.config.batch_size):
             game_id, game_history, game_prob = self.sample_game(self.buffer)
@@ -169,8 +169,8 @@ class ReplayBuffer:
                     game_pos + len(priority), len(self.buffer[game_id].priorities)
                 )
                 self.buffer[game_id].priorities[start_index:end_index] = priority[
-                    : end_index - start_index
-                ]
+                                                                         : end_index - start_index
+                                                                         ]
 
                 # Update game priorities
                 game_index = game_id - (self.self_play_count - len(self.buffer))
@@ -180,22 +180,13 @@ class ReplayBuffer:
 
                 self.max_recorded_game_priority = numpy.max(self.game_priorities)
 
-    def make_target(self, game_history, state_index, target_network_weights=None):
+    def make_target(self, game_history, state_index):
         """
         Generate targets for every unroll steps.
         """
         target_values, target_rewards, target_policies, actions = [], [], [], []
-
-        if target_network_weights:
-            target_network = models.MuZeroNetwork(self.config)
-            target_network.set_weights(target_network_weights)
-            target_network = target_network.to("cpu")
-            target_network.eval()
-        else:
-            target_network = None
-
         for current_index in range(
-            state_index, state_index + self.config.num_unroll_steps + 1
+                state_index, state_index + self.config.num_unroll_steps + 1
         ):
             # The value target is the discounted root value of the search tree td_steps into the
             # future, plus the discounted sum of all rewards until then.
@@ -220,14 +211,14 @@ class ReplayBuffer:
                 value = 0
 
             for i, reward in enumerate(
-                game_history.reward_history[current_index + 1 : bootstrap_index + 1]
+                    game_history.reward_history[current_index + 1: bootstrap_index + 1]
             ):
                 value += (
-                    reward
-                    if game_history.to_play_history[current_index]
-                    == game_history.to_play_history[current_index + 1 + i]
-                    else -reward
-                ) * self.config.discount ** i
+                             reward
+                             if game_history.to_play_history[current_index]
+                                == game_history.to_play_history[current_index + 1 + i]
+                             else -reward
+                         ) * self.config.discount ** i
 
             if current_index < len(game_history.root_values):
                 target_values.append(value)
@@ -259,3 +250,9 @@ class ReplayBuffer:
                 actions.append(numpy.random.choice(game_history.action_history))
 
         return target_values, target_rewards, target_policies, actions
+
+    def get_game_history(self, game_id):
+        return self.buffer[game_id]
+
+    def get_buffer_size(self):
+        return len(self.buffer)

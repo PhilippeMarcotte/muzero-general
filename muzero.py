@@ -13,6 +13,7 @@ import replay_buffer
 import self_play
 import shared_storage
 import trainer
+import reanalyze
 
 
 class MuZero:
@@ -64,7 +65,7 @@ class MuZero:
         shared_storage_worker = shared_storage.SharedStorage.remote(
             copy.deepcopy(self.muzero_weights), self.game_name, self.config,
         )
-        replay_buffer_worker = replay_buffer.ReplayBuffer.remote(self.config, self.Game(self.config.seed))
+        replay_buffer_worker = replay_buffer.ReplayBuffer.remote(self.config, shared_storage_worker)
         self_play_workers = [
             self_play.SelfPlay.remote(
                 copy.deepcopy(self.muzero_weights),
@@ -78,6 +79,14 @@ class MuZero:
             self.Game(self.config.seed + self.config.num_actors),
             self.config,
         )
+        if self.config.policy_update_rate > 0:
+            reanalyze_worker = reanalyze.ReanalyzeWorker.remote(
+                copy.deepcopy(self.muzero_weights),
+                shared_storage_worker,
+                replay_buffer_worker,
+                self.config
+            )
+            reanalyze_worker.update_policies.remote()
 
         # Launch workers
         [
@@ -163,7 +172,7 @@ class MuZero:
             # Comment the line below to be able to stop the training but keep running
             # raise err
             pass
-        self.muzero_weights = ray.get(shared_storage_worker.get_weights.remote())
+        self.muzero_weights = ray.get(shared_storage_worker.get_target_network_weights.remote())
         # End running actors
         ray.shutdown()
 

@@ -32,7 +32,7 @@ class SelfPlay:
     def continuous_self_play(self, shared_storage, replay_buffer, test_mode=False):
         while True:
             self.model.set_weights(
-                copy.deepcopy(ray.get(shared_storage.get_weights.remote()))
+                copy.deepcopy(ray.get(shared_storage.get_target_network_weights.remote()))
             )
 
             # Take the best action (no exploration) in test mode
@@ -90,16 +90,16 @@ class SelfPlay:
                 time.sleep(self.config.self_play_delay)
             if not test_mode and self.config.ratio:
                 while (
-                    ray.get(replay_buffer.get_self_play_count.remote())
-                    / max(
-                        1, ray.get(shared_storage.get_infos.remote())["training_step"]
-                    )
-                    > self.config.ratio
+                        ray.get(replay_buffer.get_self_play_count.remote())
+                        / max(
+                    1, ray.get(shared_storage.get_infos.remote())["training_step"]
+                )
+                        > self.config.ratio
                 ):
                     time.sleep(0.5)
 
     def play_game(
-        self, temperature, temperature_threshold, render, opponent, muzero_player
+            self, temperature, temperature_threshold, render, opponent, muzero_player
     ):
         """
         Play one game with actions based on the Monte Carlo tree search at each moves.
@@ -110,6 +110,7 @@ class SelfPlay:
         game_history.observation_history.append(observation)
         game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
+        game_history.legal_actions.append(self.game.legal_actions())
 
         done = False
 
@@ -118,7 +119,7 @@ class SelfPlay:
 
         with torch.no_grad():
             while (
-                not done and len(game_history.action_history) <= self.config.max_moves
+                    not done and len(game_history.action_history) <= self.config.max_moves
             ):
                 stacked_observations = game_history.get_stacked_observations(
                     -1, self.config.stacked_observations,
@@ -146,7 +147,7 @@ class SelfPlay:
                         root,
                         temperature
                         if not temperature_threshold
-                        or len(game_history.action_history) < temperature_threshold
+                           or len(game_history.action_history) < temperature_threshold
                         else 0,
                     )
                 elif opponent == "human":
@@ -180,7 +181,7 @@ class SelfPlay:
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
                 game_history.to_play_history.append(self.game.to_play())
-
+                game_history.legal_actions.append(self.game.legal_actions())
         self.game.close()
         return game_history
 
@@ -232,9 +233,9 @@ class MCTS:
         root = Node(0)
         observation = (
             torch.tensor(observation)
-            .float()
-            .unsqueeze(0)
-            .to(next(model.parameters()).device)
+                .float()
+                .unsqueeze(0)
+                .to(next(model.parameters()).device)
         )
         (
             root_predicted_value,
@@ -319,10 +320,10 @@ class MCTS:
         The score for a node is based on its value, plus an exploration bonus based on the prior.
         """
         pb_c = (
-            math.log(
-                (parent.visit_count + self.config.pb_c_base + 1) / self.config.pb_c_base
-            )
-            + self.config.pb_c_init
+                math.log(
+                    (parent.visit_count + self.config.pb_c_base + 1) / self.config.pb_c_base
+                )
+                + self.config.pb_c_init
         )
         pb_c *= math.sqrt(parent.visit_count) / (child.visit_count + 1)
 
@@ -412,6 +413,7 @@ class GameHistory:
         self.child_visits = []
         self.root_values = []
         self.priorities = []
+        self.legal_actions = []
 
     def store_search_statistics(self, root, action_space, idx=None):
         # Turn visit count from root into a policy
@@ -443,7 +445,7 @@ class GameHistory:
 
         stacked_observations = self.observation_history[index].copy()
         for past_observation_index in reversed(
-            range(index - num_stacked_observations, index)
+                range(index - num_stacked_observations, index)
         ):
             if 0 <= past_observation_index:
                 previous_observation = numpy.concatenate(
