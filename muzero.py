@@ -232,9 +232,9 @@ def main(logger="wandb", config_path="./configs/config.toml"):
     choice = int(choice)
     muzero = MuZero(games[choice])
     if logger == "wandb":
-        logger = WandbLogger(config)
+        logger = WandbLogger(config, muzero.config)
     else:
-        logger = TensorboardLogger(muzero.config)
+        logger = TensorboardLogger(config, muzero.config)
     while True:
         # Configure running options
         options = [
