@@ -80,7 +80,7 @@ class MuZeroConfig:
         ### Test
         self.test_episodes = 2  # Number of games rendered when calling the MuZero test method
 
-    def visit_softmax_temperature_fn(self, training_steps):
+    def visit_softmax_temperature_fn(self, trained_steps):
         """
         Parameter to alter the visit count distribution to ensure that the action selection becomes greedier as training progresses.
         The smaller it is, the more likely the best action (ie with the highest visit count) is chosen.
@@ -88,9 +88,9 @@ class MuZeroConfig:
         Returns:
             Positive float.
         """
-        if training_steps < 500e3:
+        if trained_steps < 500e3:
             return 1.0
-        elif training_steps < 750e3:
+        elif trained_steps < 750e3:
             return 0.5
         else:
             return 0.25
