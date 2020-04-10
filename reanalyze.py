@@ -22,9 +22,7 @@ class ReanalyzeWorker:
 
     def update_policies(self):
         while True:
-            start = time.time()
             keys = ray.get(self.replay_buffer.get_buffer_keys.remote())
-            keys_time = time.time() - start
             for game_id in keys:
                 game_history = ray.get(self.replay_buffer.get_game_history.remote(game_id))
                 for pos in range(len(game_history.observation_history) - 1):
@@ -42,4 +40,3 @@ class ReanalyzeWorker:
                             root, _, _ = MCTS(self.config).run(self.model, stacked_obs, game_history.legal_actions[pos],
                                                                game_history.to_play_history[pos], False)
                             game_history.store_search_statistics(root, self.config.action_space, pos)
-            print(f"list: {time.time() - start}, keys: {keys_time}")
