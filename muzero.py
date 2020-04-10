@@ -233,6 +233,8 @@ def main(logger="wandb", config_path="./configs/config.toml"):
     muzero = MuZero(games[choice])
     if logger == "wandb":
         logger = WandbLogger(config, muzero.config)
+        logger.writer.save(f"games/{games[choice]}.py")
+        logger.writer.save("configs/config.toml")
     else:
         logger = TensorboardLogger(config, muzero.config)
     while True:
