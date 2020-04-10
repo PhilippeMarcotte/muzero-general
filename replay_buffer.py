@@ -1,12 +1,8 @@
-import models
 import collections
-import copy
 
 import numpy
 import ray
-import torch
 
-from self_play import MCTS
 import torch
 
 import models
@@ -256,3 +252,6 @@ class ReplayBuffer:
 
     def get_buffer_size(self):
         return len(self.buffer)
+
+    def get_buffer_keys(self):
+        return list(self.buffer.keys())
