@@ -232,22 +232,21 @@ def main(game_name=None, action=None, seed=None, logger="wandb", config_path="./
     ]
     for i in range(len(games)):
         print("{}. {}".format(i, games[i]))
-    choice = input("Enter a number to choose the game: ")
-    valid_inputs = [str(i) for i in range(len(games))]
-    if game_name is None:
+    if game_name not in games:
+        valid_inputs = [str(i) for i in range(len(games))]
+        choice = input("Enter a number to choose the game: ")
         while choice not in valid_inputs:
             choice = input("Invalid input, enter a number listed above: ")
         choice = int(choice)
-    else:
-        choice = valid_inputs.index(game_name)
+        game_name = games[choice]
 
     # Initialize MuZero
-    muzero = MuZero(games[choice], seed)
+    muzero = MuZero(game_name, seed)
     if logger == "wandb":
         if group is not None:
             config.wandb.group = group
         logger = WandbLogger(config, muzero.config)
-        logger.writer.save(f"games/{games[choice]}.py")
+        logger.writer.save(f"games/{game_name}.py")
         logger.writer.save("configs/config.toml")
     else:
         logger = TensorboardLogger(config, muzero.config)
@@ -264,14 +263,14 @@ def main(game_name=None, action=None, seed=None, logger="wandb", config_path="./
         for i in range(len(options)):
             print("{}. {}".format(i, options[i]))
 
-        choice = input("Enter a number to choose an action: ")
-        valid_inputs = [str(i) for i in range(len(options))]
-        if action is None:
+        if action not in options:
+            choice = input("Enter a number to choose an action: ")
+            valid_inputs = [str(i) for i in range(len(options))]
             while choice not in valid_inputs:
                 choice = input("Invalid input, enter a number listed above: ")
             choice = int(choice)
         else:
-            choice = valid_inputs.index(action)
+            choice = options.index(action)
 
         if choice == 0:
             muzero.train(logger)
