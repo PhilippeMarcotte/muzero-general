@@ -12,6 +12,7 @@ if [ $state -ne 16 ]; then
   echo "Starting instance..."
   aws ec2 start-instances $instance
   aws ec2 wait instance-running $instance
+  aws ec2 wait instance-status-ok $instance
 fi
 
 host=$(aws ec2 describe-instances $instance --query 'Reservations[0].Instances[0].PublicDnsName' --output text)
