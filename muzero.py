@@ -212,7 +212,14 @@ class MuZero:
             print("\nThere is no model saved in {}.".format(path))
 
 
-def main(logger="wandb", config_path="./configs/config.toml"):
+def main(game_name=None, action=None, logger="wandb", config_path="./configs/config.toml"):
+    """
+    Hello
+
+    @param game_name: File name of any games in the game folder
+    @param action: ["Train", "Load pretrained model", "Render some self play games", "Play against MuZero"]
+    @param logger: wandb or tensorboard
+    """
     config = load_toml(config_path)
     print("\nWelcome to MuZero! Here's a list of games:")
     # Let user pick a game
@@ -225,11 +232,14 @@ def main(logger="wandb", config_path="./configs/config.toml"):
         print("{}. {}".format(i, games[i]))
     choice = input("Enter a number to choose the game: ")
     valid_inputs = [str(i) for i in range(len(games))]
-    while choice not in valid_inputs:
-        choice = input("Invalid input, enter a number listed above: ")
+    if game_name is None:
+        while choice not in valid_inputs:
+            choice = input("Invalid input, enter a number listed above: ")
+        choice = int(choice)
+    else:
+        choice = valid_inputs.index(game_name)
 
     # Initialize MuZero
-    choice = int(choice)
     muzero = MuZero(games[choice])
     if logger == "wandb":
         logger = WandbLogger(config, muzero.config)
@@ -252,9 +262,13 @@ def main(logger="wandb", config_path="./configs/config.toml"):
 
         choice = input("Enter a number to choose an action: ")
         valid_inputs = [str(i) for i in range(len(options))]
-        while choice not in valid_inputs:
-            choice = input("Invalid input, enter a number listed above: ")
-        choice = int(choice)
+        if action is None:
+            while choice not in valid_inputs:
+                choice = input("Invalid input, enter a number listed above: ")
+            choice = int(choice)
+        else:
+            choice = valid_inputs.index(action)
+
         if choice == 0:
             muzero.train(logger)
         elif choice == 1:
