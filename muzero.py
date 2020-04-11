@@ -34,13 +34,15 @@ class MuZero:
         >>> muzero.test(render=True, opponent="self", muzero_player=None)
     """
 
-    def __init__(self, game_name):
+    def __init__(self, game_name, seed=None):
         self.game_name = game_name
 
         # Load the game and the config from the module with the game name
         try:
             game_module = importlib.import_module("games." + self.game_name)
             self.config = game_module.MuZeroConfig()
+            if seed is not None:
+                self.config.seed = seed
             self.Game = game_module.Game
         except Exception as err:
             print(
@@ -212,7 +214,7 @@ class MuZero:
             print("\nThere is no model saved in {}.".format(path))
 
 
-def main(game_name=None, action=None, logger="wandb", config_path="./configs/config.toml"):
+def main(game_name=None, action=None, seed=None, logger="wandb", config_path="./configs/config.toml", group=None):
     """
     Hello
 
@@ -240,8 +242,10 @@ def main(game_name=None, action=None, logger="wandb", config_path="./configs/con
         choice = valid_inputs.index(game_name)
 
     # Initialize MuZero
-    muzero = MuZero(games[choice])
+    muzero = MuZero(games[choice], seed)
     if logger == "wandb":
+        if group is not None:
+            config.wandb.group = group
         logger = WandbLogger(config, muzero.config)
         logger.writer.save(f"games/{games[choice]}.py")
         logger.writer.save("configs/config.toml")
