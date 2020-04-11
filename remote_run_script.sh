@@ -5,4 +5,5 @@ cd /srv/data/muzero-general || sudo shutdown -h now
 git checkout dev
 git pull
 
-tsp experiments.sh
+chmod +x experiments.sh
+tsp ./experiments.sh
