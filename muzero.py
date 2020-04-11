@@ -214,7 +214,7 @@ class MuZero:
             print("\nThere is no model saved in {}.".format(path))
 
 
-def main(game_name=None, action=None, seed=None, logger="wandb", config_path="./configs/config.toml", group=None):
+def main(game_name=None, action=None, seed=None, tags=[], logger="wandb", config_path="./configs/config.toml", group=None):
     """
     Hello
 
@@ -245,7 +245,8 @@ def main(game_name=None, action=None, seed=None, logger="wandb", config_path="./
     if logger == "wandb":
         if group is not None:
             config.wandb.group = group
-        logger = WandbLogger(config, muzero.config)
+        tags.extend(str(seed))
+        logger = WandbLogger(config, muzero.config, tags)
         logger.writer.save(f"games/{game_name}.py")
         logger.writer.save("configs/config.toml")
     else:
