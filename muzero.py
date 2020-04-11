@@ -245,7 +245,7 @@ def main(game_name=None, action=None, seed=None, tags=[], logger="wandb", config
     if logger == "wandb":
         if group is not None:
             config.wandb.group = group
-        tags.extend(str(seed))
+        tags.extend(f"seed={seed}")
         logger = WandbLogger(config, muzero.config, tags)
         logger.writer.save(f"games/{game_name}.py")
         logger.writer.save("configs/config.toml")
