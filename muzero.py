@@ -287,6 +287,8 @@ def main(game_name=None, action=None, seed=None, tags=[], logger="wandb", config
         else:
             break
         print("\nDone")
+        if action is not None:
+            break
 
     ## Successive training, create a new config file for each experiment
     # experiments = ["cartpole", "tictactoe"]
