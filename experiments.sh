@@ -5,7 +5,7 @@ seeds=(0 10 20 30 40)
 
 for seed in "${seeds[@]}"; do
   for game in "${games[@]}"; do
-    python muzero.py --game_name "$game" --action $action --seed "$seed" --group "$game"
+    python muzero.py --game_name "$game" --action $action --seed "$seed" --group "$game" --tags "['buffer_size=500']"
   done
 done
 
