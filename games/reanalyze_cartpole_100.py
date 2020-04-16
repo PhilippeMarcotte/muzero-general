@@ -78,13 +78,13 @@ class MuZeroConfig:
         self.policy_update_rate = 0.8
 
         ### Replay Buffer
-        self.window_size = 500  # Number of self-play games to keep in the replay buffer
+        self.window_size = 100  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 5  # Number of game moves to keep for every batch element
         self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
 
         # Prioritized Replay (See paper appendix Training)
-        self.PER = True  # Select in priority the elements in the replay buffer which are unexpected for the network
+        self.PER = False  # Select in priority the elements in the replay buffer which are unexpected for the network
         self.use_max_priority = False  # Use the n-step TD error as initial priority. Better for large replay buffer
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
         self.PER_beta = 1.0

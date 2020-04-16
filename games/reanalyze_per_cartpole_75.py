@@ -78,7 +78,7 @@ class MuZeroConfig:
         self.policy_update_rate = 0.8
 
         ### Replay Buffer
-        self.window_size = 500  # Number of self-play games to keep in the replay buffer
+        self.window_size = 75  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 5  # Number of game moves to keep for every batch element
         self.td_steps = 50  # Number of steps in the future to take into account for calculating the target value
         self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
