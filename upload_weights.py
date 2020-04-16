@@ -11,7 +11,7 @@ for directory in os.listdir(root):
         run_id = directory[directory.rfind("-") + 1:]
         logger_config = load_toml(os.path.join(directory, "config.toml"))
 
-        wandb.init(entity=logger_config.wandb.entity, project=logger_config.wandb.project_name, resume=run_id)
+        wandb.init(entity=logger_config.wandb.entity, project=logger_config.wandb.project_name, resume=run_id, reinit=True)
 
         config = yaml.load(open(os.path.join(directory, "config.yaml")))
         weights_path = config["results_path"]["value"]
