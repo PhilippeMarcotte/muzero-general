@@ -299,6 +299,8 @@ def main(game_name=None, action=None, seed=None, tags=[], logger="wandb", config
         if action is not None:
             break
 
+    if isinstance(logger, WandbLogger):
+        logger.writer.save(os.path.join(muzero.config.results_path, "model.weights"))
     ## Successive training, create a new config file for each experiment
     # experiments = ["cartpole", "tictactoe"]
     # for experiment in experiments:
