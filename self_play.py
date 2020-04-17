@@ -9,7 +9,7 @@ import torch
 import models
 
 
-@ray.remote
+@ray.remote(num_cpus=1)
 class SelfPlay:
     """
     Class which run in a dedicated thread to play games and save them to the replay-buffer.
@@ -18,6 +18,9 @@ class SelfPlay:
     def __init__(self, initial_weights, game, config):
         self.config = config
         self.game = game
+
+        self.sum_reward = 0
+        self.num_game_played = 0
 
         # Fix random generator seed
         numpy.random.seed(self.config.seed)
@@ -53,10 +56,20 @@ class SelfPlay:
                 0,
             )
 
+            self.num_game_played += 1
+
             # Save to the shared storage
             if test_mode:
+                total_reward = sum(game_history.reward_history)
                 shared_storage.set_infos.remote(
-                    "total_reward", sum(game_history.reward_history)
+                    "total_reward", total_reward
+                )
+                self.sum_reward += total_reward
+                shared_storage.set_infos.remote(
+                    "average_reward", self.sum_reward / self.num_game_played
+                )
+                shared_storage.set_infos.remote(
+                    "test_games", self.num_game_played
                 )
                 shared_storage.set_infos.remote(
                     "episode_length", len(game_history.action_history)

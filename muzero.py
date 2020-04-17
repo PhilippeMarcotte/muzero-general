@@ -132,10 +132,14 @@ class MuZero:
                     infos["player_0_reward"],
                     counter,
                 )
+
                 writer.add_scalar(
                     "1.Total reward/4.Player 1 Random reward",
                     infos["player_1_reward"],
                     counter,
+                )
+                writer.add_scalar(
+                    "1.Total reward/5.Average reward", infos["average_reward"], counter,
                 )
                 writer.add_scalar(
                     "2.Workers/1.Self played games",
@@ -152,6 +156,11 @@ class MuZero:
                     counter,
                 )
                 writer.add_scalar("2.Workers/4.Learning rate", infos["lr"], counter)
+                writer.add_scalar(
+                    "2.Workers/5.Self played test games",
+                    infos["test_games"],
+                    counter,
+                )
                 writer.add_scalar(
                     "3.Loss/1.Total weighted loss", infos["total_loss"], counter
                 )
