@@ -53,6 +53,10 @@ class ReplayBuffer:
             self.total_samples -= len(self.buffer[del_id].priorities)
             del self.buffer[del_id]
 
+    def update_game(self, game_history, idx):
+        if idx in self.buffer:
+            self.buffer[idx] = game_history
+
     def get_self_play_count(self):
         return self.self_play_count
 
@@ -67,9 +71,6 @@ class ReplayBuffer:
             weight_batch,
             gradient_scale_batch,
         ) = ([], [], [], [], [], [], [], [])
-
-        if self.config.use_last_model_value:
-            self.model.set_weights(ray.get(self.shared_storage.get_target_network_weights.remote()))
 
         for _ in range(self.config.batch_size):
             game_id, game_history, game_prob = self.sample_game(self.buffer)
@@ -188,19 +189,7 @@ class ReplayBuffer:
             # future, plus the discounted sum of all rewards until then.
             bootstrap_index = current_index + self.config.td_steps
             if bootstrap_index < len(game_history.root_values):
-                if self.config.use_last_model_value:
-                    # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
-                    observation = torch.tensor(
-                        game_history.get_stacked_observations(
-                            bootstrap_index, self.config.stacked_observations
-                        )
-                    ).float()
-                    last_step_value = models.support_to_scalar(
-                        self.model.initial_inference(observation)[0],
-                        self.config.support_size,
-                    ).item()
-                else:
-                    last_step_value = game_history.root_values[bootstrap_index]
+                last_step_value = game_history.root_values[bootstrap_index]
 
                 value = last_step_value * self.config.discount ** self.config.td_steps
             else:
