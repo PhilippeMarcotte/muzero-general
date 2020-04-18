@@ -29,13 +29,13 @@ class ReanalyzeWorker:
         while True:
             keys = ray.get(self.replay_buffer.get_buffer_keys.remote())
             for game_id in keys:
+                remcts_count = 0
                 self.latest_network.set_weights(ray.get(self.shared_storage.get_network_weights.remote()))
                 self.target_network.set_weights(ray.get(self.shared_storage.get_target_network_weights.remote()))
 
                 game_history = copy.deepcopy(ray.get(self.replay_buffer.get_game_history.remote(game_id)))
 
                 for pos in range(len(game_history.observation_history)):
-
                     bootstrap_index = pos + self.config.td_steps
                     if bootstrap_index < len(game_history.root_values):
                         if self.config.use_last_model_value:
@@ -62,4 +62,8 @@ class ReanalyzeWorker:
                             root, _, _ = MCTS(self.config).run(self.latest_network, stacked_obs, game_history.legal_actions[pos],
                                                                game_history.to_play_history[pos], False)
                             game_history.store_search_statistics(root, self.config.action_space, pos)
+                        remcts_count += 1
+
+                self.shared_storage.update_infos.remote("remcts_count", remcts_count)
+                self.shared_storage.update_infos.remote("reanalyzed_count", len(game_history.priorities))
                 self.replay_buffer.update_game.remote(game_history, game_id)

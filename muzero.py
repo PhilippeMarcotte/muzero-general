@@ -162,6 +162,37 @@ class MuZero:
                     counter,
                 )
                 writer.add_scalar(
+                    "2.Workers/6.Samples count per training step ratio",
+                    infos["samples_count"]
+                    / max(1, infos["training_step"]),
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/7.Samples count",
+                    infos["samples_count"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/8.Reanalyzed count",
+                    infos["reanalyzed_count"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/9.Reanalyzed count per samples count",
+                    infos["reanalyzed_count"] / max(1, infos["samples_count"]),
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/10.ReMCTS count",
+                    infos["remcts_count"],
+                    counter,
+                )
+                writer.add_scalar(
+                    "2.Workers/11.ReMCTS count per samples count",
+                    infos["remcts_count"] / max(1, infos["samples_count"]),
+                    counter,
+                )
+                writer.add_scalar(
                     "3.Loss/1.Total weighted loss", infos["total_loss"], counter
                 )
                 writer.add_scalar("3.Loss/Value loss", infos["value_loss"], counter)
