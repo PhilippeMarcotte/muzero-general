@@ -97,13 +97,14 @@ class SelfPlay:
                     )
             if not test_mode:
                 replay_buffer.save_game.remote(game_history)
+                shared_storage.update_infos.remote("samples_count", len(game_history.priorities))
 
             # Managing the self-play / training ratio
             if not test_mode and self.config.self_play_delay:
                 time.sleep(self.config.self_play_delay)
             if not test_mode and self.config.ratio:
                 while (
-                        ray.get(replay_buffer.get_self_play_count.remote())
+                        ray.get(shared_storage.get_infos.remote())["samples_count"]
                         / max(
                     1, ray.get(shared_storage.get_infos.remote())["training_step"]
                 )

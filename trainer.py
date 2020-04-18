@@ -82,7 +82,7 @@ class Trainer:
                 time.sleep(self.config.training_delay)
             if self.config.ratio:
                 while (
-                        ray.get(replay_buffer.get_self_play_count.remote())
+                        ray.get(shared_storage_worker.get_infos.remote())["samples_count"]
                         / max(1, self.training_step)
                         < self.config.ratio
                 ):

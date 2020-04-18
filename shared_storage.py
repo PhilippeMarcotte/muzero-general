@@ -22,6 +22,9 @@ class SharedStorage:
             "episode_length": 0,
             "training_step": 0,
             "test_games": 0,
+            "samples_count": 0,
+            "reanalyzed_count": 0,
+            "remcts_count": 0,
             "lr": 0,
             "total_loss": 0,
             "value_loss": 0,
@@ -50,3 +53,6 @@ class SharedStorage:
 
     def set_infos(self, key, value):
         self.infos[key] = value
+
+    def update_infos(self, key, value):
+        self.infos[key] += value
