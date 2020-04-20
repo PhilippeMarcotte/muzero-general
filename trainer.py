@@ -44,14 +44,18 @@ class Trainer:
                 "{} is not implemented. You can change the optimizer manually in trainer.py."
             )
 
-    def continuous_update_weights(self, replay_buffer, shared_storage_worker):
+    def continuous_update_weights(self, replay_buffer, shared_storage_worker, queue=None):
         # Wait for the replay buffer to be filled
         while ray.get(replay_buffer.get_self_play_count.remote()) < 1:
             time.sleep(0.1)
 
         # Training loop
         while True:
-            index_batch, batch = ray.get(replay_buffer.get_batch.remote())
+            if queue is None:
+                index_batch, batch = ray.get(replay_buffer.get_batch.remote())
+            else:
+                index_batch, batch = queue.get(block=True)
+
             self.update_lr()
             (
                 priorities,

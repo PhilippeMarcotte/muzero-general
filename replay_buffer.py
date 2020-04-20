@@ -125,7 +125,7 @@ class ReplayBuffer:
             ),
         )
 
-    def sample_game(self, buffer):
+    def sample_game(self):
         """
         Sample game from buffer either uniformly or according to some priority.
         See paper appendix Training.
@@ -244,3 +244,8 @@ class ReplayBuffer:
 
     def get_buffer_keys(self):
         return list(self.buffer.keys())
+
+    def sample_game_position(self):
+        game_id, game_history, game_prob = self.sample_game()
+        game_pos, pos_prob = self.sample_position(game_history)
+        return self.total_samples, game_id, game_history, game_prob, game_pos, pos_prob

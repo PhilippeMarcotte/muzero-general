@@ -1,4 +1,7 @@
 import wandb
+from ray.experimental.queue import Queue
+
+import reanalyze_queue
 from utils.logging import Logger, TensorboardLogger, WandbLogger
 import copy
 import importlib
@@ -84,14 +87,18 @@ class MuZero:
             self.Game(self.config.seed + self.config.num_actors),
             self.config,
         )
+        queue = None
         if self.config.policy_update_rate > 0:
-            reanalyze_worker = reanalyze.ReanalyzeWorker.remote(
-                copy.deepcopy(self.muzero_weights),
-                shared_storage_worker,
-                replay_buffer_worker,
-                self.config
-            )
-            reanalyze_worker.update_policies.remote()
+            queue = Queue()
+            for i in range(self.config.num_reanalyze_cpus):
+                reanalyze_worker = reanalyze_queue.ReanalyzeQueueWorker.remote(
+                    copy.deepcopy(self.muzero_weights),
+                    shared_storage_worker,
+                    replay_buffer_worker,
+                    self.config,
+                    queue
+                )
+                reanalyze_worker.fill_batch_queue.remote()
 
         # Launch workers
         [
@@ -102,7 +109,7 @@ class MuZero:
         ]
         test_worker.continuous_self_play.remote(shared_storage_worker, None, True)
         training_worker.continuous_update_weights.remote(
-            replay_buffer_worker, shared_storage_worker
+            replay_buffer_worker, shared_storage_worker, queue
         )
 
         # Save hyperparameters to TensorBoard
@@ -254,7 +261,8 @@ class MuZero:
             print("\nThere is no model saved in {}.".format(path))
 
 
-def main(game_name=None, action=None, seed=None, tags=[], logger="wandb", config_path="./configs/config.toml", group=None):
+def main(game_name="reanalyze_cartpole", action="Train", seed=None, tags=[], logger="wandb",
+         config_path="./configs/config.toml", group=None):
     """
     Hello
 
