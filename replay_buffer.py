@@ -73,7 +73,7 @@ class ReplayBuffer:
         ) = ([], [], [], [], [], [], [], [])
 
         for _ in range(self.config.batch_size):
-            game_id, game_history, game_prob = self.sample_game(self.buffer)
+            game_id, game_history, game_prob = self.sample_game()
             game_pos, pos_prob = self.sample_position(game_history)
 
             values, rewards, policies, actions = self.make_target(
