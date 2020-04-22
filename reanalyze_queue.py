@@ -3,11 +3,9 @@ import time
 
 import ray
 import torch
-from ray.experimental.queue import Queue
 import numpy as np
 import models
 from self_play import MCTS
-import copy
 
 
 @ray.remote(num_cpus=1)
