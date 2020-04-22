@@ -225,7 +225,7 @@ class MuZero:
         # End running actors
         ray.shutdown()
 
-    def test(self, render, opponent, muzero_player):
+    def test(self, render, opponent, muzero_player, ray_init=True):
         """
         Test the model in a dedicated thread.
 
@@ -239,7 +239,8 @@ class MuZero:
             games, None let MuZero play all players turn by turn.
         """
         print("\nTesting...")
-        ray.init()
+        if ray_init:
+            ray.init()
         self_play_workers = self_play.SelfPlay.remote(
             copy.deepcopy(self.muzero_weights),
             self.Game(self.config.seed + self.config.num_actors),
@@ -248,7 +249,8 @@ class MuZero:
         history = ray.get(
             self_play_workers.play_game.remote(0, 0, render, opponent, muzero_player)
         )
-        ray.shutdown()
+        if ray_init:
+            ray.shutdown()
         return sum(history.reward_history)
 
     def load_model(self, path=None):
