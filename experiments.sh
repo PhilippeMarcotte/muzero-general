@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-games=("basic_cartpole" "per_cartpole" "reanalyze_cartpole" "reanalyze_per_cartpole")
+games=("true_reanalyze_cartpole")
 action="Train"
-seeds=(0 10 20 30 40)
+seeds=(0 10 20 50 60)
+bufferSizes=(100 75 50 25)
+ratios=("0_5" "1" "2")
 
-for seed in "${seeds[@]}"; do
+for ratio in "${ratios[@]}"; do
   for game in "${games[@]}"; do
-    python muzero.py --game_name "$game" --action $action --seed "$seed" --group "$game" --tags "['buffer_size=500']"
+    for seed in "${seeds[@]}"; do
+      python muzero.py --game_name "${game}_75_ratio_${ratio}_sim_50" --action $action --seed "$seed" --group "$game" --tags "['buffer_size=75', 'ratio=${ratio/_/.}']"
+    done
   done
 done
-
-sudo shutdown -h now
