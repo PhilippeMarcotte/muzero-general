@@ -1,0 +1,7 @@
+project_name = "rl-project"
+entity = "lap1n"
+num_episodes= 50
+num_workers=10
+run_ids=[]
+[filters]
+group = "basic_cartpole"

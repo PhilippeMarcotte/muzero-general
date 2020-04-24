@@ -1,8 +1,0 @@
-project_name = "rl-project"
-entity = "lap1n"
-num_episodes= 10
-num_workers=1
-run_ids=["x748xt64"]
-[filters]
-#group = "reanalyze_per_cartpole"
-"config.PER" = false

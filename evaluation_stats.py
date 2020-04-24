@@ -4,7 +4,7 @@ import numpy as np
 import fire
 
 
-def evaluation_stats(results_path=r'./evaluation_results/test_results_{"group": "reanalyze_per_cartpole"}.json'):
+def evaluation_stats(results_path=r'./evaluation_results/final/test_results__group-basic_cartpole.json'):
     with open(results_path, mode="r") as f:
         results = json.load(f)
         mean_scores = {}
