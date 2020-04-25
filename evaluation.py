@@ -57,12 +57,13 @@ class ModelEvaluator:
             muzero = MuZero(env_config_name, seed=seed)
             muzero.load_model(weight_file_path)
             total_reward = muzero.test(render=False, opponent="self", muzero_player=None, ray_init=False)
+            print(f"Total reward : {total_reward}")
             ray.get(self.results.set_result.remote(env_config_name, total_reward))
             print(f"{env_config_name} done.")
         return True
 
 
-def evaluation(evaluation_config_path="./configs/evaluation.toml"):
+def evaluation(evaluation_config_path="./configs/reanalyze_evaluation.toml"):
     t1 = time.time()
     ray.init()
     config = load_toml(evaluation_config_path)
@@ -74,8 +75,7 @@ def evaluation(evaluation_config_path="./configs/evaluation.toml"):
     results = SharedResults.remote(num_episodes=config.num_episodes)
 
     job_queue = Queue()
-    print(len(runs))
-    # Fill the queue with model to evaluate
+    # Fill the queue with models to evaluate
     for run in runs:
         files = run.files()
         print(files)
@@ -108,12 +108,13 @@ def evaluation(evaluation_config_path="./configs/evaluation.toml"):
         evaluators.append(model_evaluator.evaluate.remote())
     # Wait for all the workers to be done
     ray.get(evaluators)
-    # Save the model
-    ids_string = '_'.join(config.run_ids)
+    # Save the results
+    ids_string = '_'.join(config.run_ids[-10])
     filter_string = '_'.join([f"{key}-{value}" for key, value in config.filters.items()])
     with open(f'evaluation_results/test_results_{ids_string}_{filter_string}.json', 'w') as outfile:
         json.dump(ray.get(results.get_result.remote()), outfile)
-    print(f"Time taken : {time.time()-t1}")
+    print(f"Time taken : {time.time() - t1}")
+
 
 if __name__ == "__main__":
     fire.Fire(evaluation)

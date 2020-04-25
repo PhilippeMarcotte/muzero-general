@@ -1,0 +1,6 @@
+project_name = "rl-project"
+entity = "lap1n"
+num_episodes= 50
+num_workers=10
+run_ids=["3cplek04","3ih50gi5","weviku4e","k6xd6war","2oqi8o9f"]
+[filters]
