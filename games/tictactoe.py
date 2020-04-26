@@ -25,7 +25,7 @@ class MuZeroConfig:
         ### Self-Play
         self.num_actors = 1  # Number of simultaneous threads self-playing to feed the replay buffer
         self.max_moves = 9  # Maximum number of moves if game is not finished before
-        self.num_simulations = 25  # Number of future moves self-simulated
+        self.num_simulations = 50  # Number of future moves self-simulated
         self.discount = 1  # Chronological discount of the reward
         self.temperature_threshold = 6  # Number of moves before dropping temperature to 0 (ie playing according to the max)
 
@@ -64,11 +64,11 @@ class MuZeroConfig:
 
         ### Training
         self.results_path = os.path.join(os.path.dirname(__file__), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
-        self.training_steps = 100000  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 64  # Number of parts of games to train on at each training step
+        self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
+        self.batch_size = 128  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for sef-playing
-        self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
-        self.training_device = "cuda" if torch.cuda.is_available() else "cpu"  # Train on GPU if available
+        self.value_loss_weight = 1  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
+        self.training_device = "cpu" if torch.cuda.is_available() else "cpu"  # Train on GPU if available
 
         self.optimizer = "Adam"  # "Adam" or "SGD". Paper uses SGD
         self.weight_decay = 1e-4  # L2 weights regularization
@@ -80,16 +80,16 @@ class MuZeroConfig:
         self.lr_decay_steps = 10000
 
         # Muzero Reanalyze
-        self.policy_update_rate = 0.8
+        self.policy_update_rate = 0
 
         ### Replay Buffer
         self.window_size = 3000  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 20  # Number of game moves to keep for every batch element
         self.td_steps = 20  # Number of steps in the future to take into account for calculating the target value
-        self.use_last_model_value = True  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
+        self.use_last_model_value = False  # Use the last model to provide a fresher, stable n-step value (See paper appendix Reanalyze)
 
         # Prioritized Replay (See paper appendix Training)
-        self.PER = True  # Select in priority the elements in the replay buffer which are unexpected for the network
+        self.PER = False  # Select in priority the elements in the replay buffer which are unexpected for the network
         self.use_max_priority = False  # Use the n-step TD error as initial priority. Better for large replay buffer
         self.PER_alpha = 0.5  # How much prioritization is used, 0 corresponding to the uniform case, paper suggests 1
         self.PER_beta = 1.0
@@ -119,7 +119,7 @@ class Game(AbstractGame):
     """
 
     def __init__(self, seed=None):
-        self.env = TicTacToe()
+        self.env = TicTacToe(seed)
 
     def step(self, action):
         """
@@ -142,6 +142,15 @@ class Game(AbstractGame):
             The current player, it should be an element of the players list in the config. 
         """
         return self.env.to_play()
+
+    def to_play_real(self):
+        """
+        Return the current player.
+
+        Returns:
+            The current player, it should be an element of the players list in the config.
+        """
+        return self.env.to_play_real()
 
     def legal_actions(self):
         """
@@ -233,18 +242,25 @@ class Game(AbstractGame):
         col = action_number % 3 + 1
         return "Play row {}, column {}".format(row, col)
 
+    def get_state(self):
+        return self.env.board
+
 
 class TicTacToe:
-    def __init__(self):
+    def __init__(self, seed):
+        numpy.random.seed(seed)
         self.board = numpy.zeros((3, 3)).astype(int)
-        self.player = 1
+        self.player = numpy.random.choice([-1, 1])
 
     def to_play(self):
         return 0 if self.player == 1 else 1
 
+    def to_play_real(self):
+        return self.player
+
     def reset(self):
         self.board = numpy.zeros((3, 3)).astype(int)
-        self.player = 1
+        self.player = numpy.random.choice([-1, 1])
         return self.get_observation()
 
     def step(self, action):
