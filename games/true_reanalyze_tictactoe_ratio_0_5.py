@@ -23,7 +23,7 @@ class MuZeroConfig:
 
 
         ### Self-Play
-        self.num_actors = 1  # Number of simultaneous threads self-playing to feed the replay buffer
+        self.num_actors = 3  # Number of simultaneous threads self-playing to feed the replay buffer
         self.max_moves = 9  # Maximum number of moves if game is not finished before
         self.num_simulations = 25  # Number of future moves self-simulated
         self.discount = 1  # Chronological discount of the reward
@@ -64,7 +64,7 @@ class MuZeroConfig:
 
         ### Training
         self.results_path = os.path.join(os.path.dirname(__file__), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
-        self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
+        self.training_steps = 40000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 128  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for sef-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
@@ -81,7 +81,7 @@ class MuZeroConfig:
 
         # Muzero Reanalyze
         self.policy_update_rate = 0.8
-        self.num_reanalyze_cpus = 91
+        self.num_reanalyze_cpus = 27
 
         ### Replay Buffer
         self.window_size = 3000  # Number of self-play games to keep in the replay buffer
