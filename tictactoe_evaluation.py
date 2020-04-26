@@ -8,9 +8,10 @@ import models
 import importlib
 import torch
 from self_play import MCTS, SelfPlay, GameHistory
+import tqdm
 
 
-class MinMax:
+class Expert:
     def __init__(self, me, other):
         self.board = [
             [0, 0, 0],
@@ -150,7 +151,12 @@ class MinMax:
 
         return best
 
-def play_against_other(weights1, config1, weights2, config2, seed):
+
+def _play_against_other(args):
+    return play_against_other(*args)
+
+
+def play_against_other(weights1, config1, weights2, config2, seed, render=False):
     game_module = importlib.import_module("games." + config1)
     config1 = game_module.MuZeroConfig()
     model1 = models.MuZeroNetwork(config1)
@@ -204,6 +210,8 @@ def play_against_other(weights1, config1, weights2, config2, seed):
         game_history.store_search_statistics(root, config.action_space)
         game_history.priorities.append(priority)
         observation, reward, done = game.step(action)
+        if render:
+            game.render()
 
         game_history.action_history.append(action)
         game_history.observation_history.append(observation)
@@ -211,17 +219,53 @@ def play_against_other(weights1, config1, weights2, config2, seed):
         game_history.to_play_history.append(game.to_play())
         game_history.legal_actions.append(game.legal_actions())
 
-    return reward, game.to_play_real() * -1
+    return reward, Expert.wins(game.get_state(), 1)
 
 
-def play_against_optimal(weight_file_path, config_name, seed):
+def _play_against_algorithm(args):
+    return play_against_algorithm(*args)
+
+
+def evaluate_against_other(weights1, config1, weights2, config2, n_tests=20, render=False, seed=0):
+    player1_win = 0
+    player2_win = 0
+    draw = 0
+
+    if render:
+        reward, player = play_against_other(weights1, config1, weights2, config2, seed, render=render)
+        if reward:
+            if player == 1:
+                player1_win += 1
+            else:
+                player2_win += 1
+        else:
+            draw += 1
+    else:
+        pool = Pool()
+        for reward, player1_won in tqdm.tqdm(pool.imap(_play_against_other,
+                                                       zip([weights1] * n_tests, [config1] * n_tests,
+                                                           [weights2] * n_tests, [config2] * n_tests,
+                                                           np.arange(n_tests))), total=n_tests):
+            if reward:
+                if player1_won:
+                    player1_win += 1
+                else:
+                    player2_win += 1
+            else:
+                draw += 1
+
+    print(player1_win, player2_win, draw)
+
+
+def play_against_algorithm(weight_file_path, config_name, seed, algo="expert"):
     game_module = importlib.import_module("games." + config_name)
     config = game_module.MuZeroConfig()
     model = models.MuZeroNetwork(config)
     model.set_weights(torch.load(weight_file_path))
     model.eval()
 
-    minmax = MinMax(-1, 1)
+    if algo == "expert":
+        algo = Expert(-1, 1)
 
     game = Game(seed)
     observation = game.reset()
@@ -238,8 +282,8 @@ def play_against_optimal(weight_file_path, config_name, seed):
     reward = 0
 
     while not done:
-        if game.to_play_real() == -1:
-            action = minmax(game.get_state(), depth, game.to_play_real())
+        if game.to_play_real() == 1:
+            action = algo(game.get_state(), depth, game.to_play_real())
         else:
             stacked_observations = game_history.get_stacked_observations(
                 -1, config.stacked_observations,
@@ -269,55 +313,22 @@ def play_against_optimal(weight_file_path, config_name, seed):
         game_history.to_play_history.append(game.to_play())
         game_history.legal_actions.append(game.legal_actions())
 
-    return reward, game.to_play_real() * -1
+    return reward, Expert.wins(game.get_state(), 1)
 
 
-def evaluate_against_other(weights1, config1, weights2, config2, n_tests=20):
+def evaluate_against_algorithm(weights, config, algorithm="expert", n_tests=20):
     player1_win = 0
     player2_win = 0
     draw = 0
 
     pool = Pool()
 
-    # reward, player = play(weights, config, 0)
-    # if reward:
-    #     if player == 1:
-    #         player1_win += 1
-    #     else:
-    #         player2_win += 1
-    # else:
-    #     draw += 1
-    for reward, player in pool.starmap(play_against_other,
-                                       zip([weights1] * n_tests, [config1] * n_tests, [weights2] * n_tests, [config2] * n_tests, np.arange(n_tests))):
+    for reward, player1_won in tqdm.tqdm(
+            pool.imap(_play_against_algorithm,
+                      zip([weights] * n_tests, [config] * n_tests, np.arange(n_tests), [algorithm] * n_tests)),
+            total=n_tests):
         if reward:
-            if player == 1:
-                player1_win += 1
-            else:
-                player2_win += 1
-        else:
-            draw += 1
-
-    print(player1_win, player2_win, draw)
-
-
-def evaluate_against_optimal(weights, config, n_tests=20):
-    player1_win = 0
-    player2_win = 0
-    draw = 0
-
-    pool = Pool()
-
-    # reward, player = play(weights, config, 0)
-    # if reward:
-    #     if player == 1:
-    #         player1_win += 1
-    #     else:
-    #         player2_win += 1
-    # else:
-    #     draw += 1
-    for reward, player in pool.starmap(play_against_optimal, zip([weights] * n_tests, [config] * n_tests, np.arange(n_tests))):
-        if reward:
-            if player == 1:
+            if player1_won:
                 player1_win += 1
             else:
                 player2_win += 1
@@ -328,4 +339,4 @@ def evaluate_against_optimal(weights, config, n_tests=20):
 
 
 if __name__ == "__main__":
-    fire.Fire(evaluate_against_other)
+    fire.Fire(evaluate_against_algorithm)
