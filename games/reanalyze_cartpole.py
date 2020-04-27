@@ -75,6 +75,7 @@ class MuZeroConfig:
         self.lr_decay_steps = 10000
 
         # Muzero Reanalyze
+        self.reanalyze_mode = "true"  # or "fast"
         self.policy_update_rate = 0.8
         self.num_reanalyze_cpus = 9
         ### Replay Buffer
