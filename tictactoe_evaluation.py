@@ -9,9 +9,11 @@ import importlib
 import torch
 from self_play import MCTS, SelfPlay, GameHistory
 import tqdm
+from abc import ABC, abstractmethod
+import copy
 
 
-class Expert:
+class TictactoeComp(ABC):
     def __init__(self, me, other):
         self.board = [
             [0, 0, 0],
@@ -21,20 +23,25 @@ class Expert:
         self.me = me
         self.other = other
 
-    def evaluate(self, state):
-        """
-        Function to heuristic evaluation of state.
-        :param state: the state of the current board
-        :return: +1 if the computer wins; -1 if the human wins; 0 draw
-        """
-        if self.wins(state, self.me):
-            score = +1
-        elif self.wins(state, self.other):
-            score = -1
-        else:
-            score = 0
+    @abstractmethod
+    def __call__(self, *args, **kwargs):
+        pass
 
-        return score
+    @staticmethod
+    def empty_cells(state):
+        """
+        Each empty cell will be added into cells' list
+        :param state: the state of the current board
+        :return: a list of empty cells
+        """
+        cells = []
+
+        for x, row in enumerate(state):
+            for y, cell in enumerate(row):
+                if cell == 0:
+                    cells.append([x, y])
+
+        return cells
 
     @staticmethod
     def wins(state, player):
@@ -62,6 +69,27 @@ class Expert:
         else:
             return False
 
+    @staticmethod
+    def coord_to_index(x, y):
+        row = np.arange(3)
+        column = np.arange(3)
+        return row[x] * 3 + column[y]
+
+    def evaluate(self, state):
+        """
+        Function to heuristic evaluation of state.
+        :param state: the state of the current board
+        :return: +1 if the computer wins; -1 if the human wins; 0 draw
+        """
+        if self.wins(state, self.me):
+            score = +1
+        elif self.wins(state, self.other):
+            score = -1
+        else:
+            score = 0
+
+        return score
+
     def game_over(self, state):
         """
         This function test if the human or computer wins
@@ -69,22 +97,6 @@ class Expert:
         :return: True if the human or computer wins
         """
         return self.wins(state, self.other) or self.wins(state, self.me)
-
-    @staticmethod
-    def empty_cells(state):
-        """
-        Each empty cell will be added into cells' list
-        :param state: the state of the current board
-        :return: a list of empty cells
-        """
-        cells = []
-
-        for x, row in enumerate(state):
-            for y, cell in enumerate(row):
-                if cell == 0:
-                    cells.append([x, y])
-
-        return cells
 
     def valid_move(self, x, y):
         """
@@ -98,26 +110,44 @@ class Expert:
         else:
             return False
 
-    def set_move(self, x, y, player):
-        """
-        Set the move on board, if the coordinates are valid
-        :param x: X coordinate
-        :param y: Y coordinate
-        :param player: the current player
-        """
-        if self.valid_move(x, y):
-            self.board[x][y] = player
-            return True
-        else:
-            return False
 
+class Random(TictactoeComp):
     def __call__(self, state, depth, player):
-        x, y, player = self.minimax(state, depth, player)
-        row = np.arange(len(self.board))
-        column = np.arange(len(self.board[0]))
-        return row[x] * 3 + column[y]
+        empty_cells = self.empty_cells(state)
+        cell = np.random.randint(0, len(empty_cells))
+        return self.coord_to_index(*empty_cells[cell])
 
-    def minimax(self, state, depth, player):
+
+class Intermediate(TictactoeComp):
+    def __call__(self, state, depth, player):
+        legal_moves = self.empty_cells(state)
+        for move in legal_moves:
+            x, y = move
+            new_state = copy.deepcopy(state)
+            new_state[x, y] = player
+            if self.wins(new_state, player):
+                return self.coord_to_index(x, y)
+
+        opponent = -player
+        for move in legal_moves:
+            x, y = move
+            new_state = copy.deepcopy(state)
+            new_state[x, y] = opponent
+            if self.wins(new_state, opponent):
+                return self.coord_to_index(x, y)
+
+        cell = np.random.randint(0, len(legal_moves))
+        return self.coord_to_index(*legal_moves[cell])
+
+
+class Expert(TictactoeComp):
+    def __call__(self, state, depth, player):
+        if (np.array(state) == 0).all():
+            return np.random.choice([0, 2, 6, 8])
+        x, y, player = self.minmax(state, depth, player)
+        return self.coord_to_index(x, y)
+
+    def minmax(self, state, depth, player):
         """
         AI function that choice the best move
         :param state: current state of the board
@@ -138,7 +168,7 @@ class Expert:
         for cell in self.empty_cells(state):
             x, y = cell[0], cell[1]
             state[x][y] = player
-            score = self.minimax(state, depth - 1, -player)
+            score = self.minmax(state, depth - 1, -player)
             state[x][y] = 0
             score[0], score[1] = x, y
 
@@ -157,6 +187,8 @@ def _play_against_other(args):
 
 
 def play_against_other(weights1, config1, weights2, config2, seed, render=False):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     game_module = importlib.import_module("games." + config1)
     config1 = game_module.MuZeroConfig()
     model1 = models.MuZeroNetwork(config1)
@@ -172,12 +204,27 @@ def play_against_other(weights1, config1, weights2, config2, seed, render=False)
     game = Game(seed)
     observation = game.reset()
 
-    game_history = GameHistory()
-    game_history.action_history.append(0)
-    game_history.reward_history.append(0)
-    game_history.to_play_history.append(game.to_play())
-    game_history.legal_actions.append(game.legal_actions())
-    game_history.observation_history.append(observation)
+    game_history1 = GameHistory()
+    game_history1.action_history.append(0)
+    game_history1.reward_history.append(0)
+    game_history1.to_play_history.append(game.to_play())
+    game_history1.legal_actions.append(game.legal_actions())
+    observation1 = copy.deepcopy(observation)
+    # observation1[0] = -observation1[1]
+    # observation1[1] = -observation1[0]
+    # observation1[2] = -observation1[2]
+    game_history1.observation_history.append(observation1)
+
+    game_history2 = GameHistory()
+    game_history2.action_history.append(0)
+    game_history2.reward_history.append(0)
+    game_history2.to_play_history.append(not game.to_play())
+    game_history2.legal_actions.append(game.legal_actions())
+    observation2 = copy.deepcopy(observation)
+    observation2[0] = -observation2[1]
+    observation2[1] = -observation2[0]
+    observation2[2] = -observation2[2]
+    game_history2.observation_history.append(observation2)
 
     done = False
     reward = 0
@@ -186,9 +233,11 @@ def play_against_other(weights1, config1, weights2, config2, seed, render=False)
         if game.to_play_real() == 1:
             config = config1
             model = model1
+            game_history = game_history1
         else:
             config = config2
             model = model2
+            game_history = game_history2
 
         stacked_observations = game_history.get_stacked_observations(
             -1, config.stacked_observations,
@@ -207,19 +256,35 @@ def play_against_other(weights1, config1, weights2, config2, seed, render=False)
             0,
         )
 
-        game_history.store_search_statistics(root, config.action_space)
-        game_history.priorities.append(priority)
+        game_history1.store_search_statistics(root, config.action_space)
+        game_history1.priorities.append(priority)
+        game_history2.store_search_statistics(root, config.action_space)
+        game_history2.priorities.append(priority)
         observation, reward, done = game.step(action)
         if render:
             game.render()
 
-        game_history.action_history.append(action)
-        game_history.observation_history.append(observation)
-        game_history.reward_history.append(reward)
-        game_history.to_play_history.append(game.to_play())
-        game_history.legal_actions.append(game.legal_actions())
+        game_history1.action_history.append(action)
+        observation1 = copy.deepcopy(observation)
+        # observation1[0] = -observation1[1]
+        # observation1[1] = -observation1[0]
+        # observation1[2] = -observation1[2]
+        game_history1.observation_history.append(observation1)
+        game_history1.reward_history.append(reward)
+        game_history1.to_play_history.append(game.to_play())
+        game_history1.legal_actions.append(game.legal_actions())
 
-    return reward, Expert.wins(game.get_state(), 1)
+        game_history2.action_history.append(action)
+        observation2 = copy.deepcopy(observation)
+        observation2[0] = -observation2[1]
+        observation2[1] = -observation2[0]
+        observation2[2] = -observation2[2]
+        game_history2.observation_history.append(observation2)
+        game_history2.reward_history.append(reward)
+        game_history2.to_play_history.append(not game.to_play())
+        game_history2.legal_actions.append(game.legal_actions())
+
+    return reward, TictactoeComp.wins(game.get_state(), 1)
 
 
 def _play_against_algorithm(args):
@@ -232,9 +297,9 @@ def evaluate_against_other(weights1, config1, weights2, config2, n_tests=20, ren
     draw = 0
 
     if render:
-        reward, player = play_against_other(weights1, config1, weights2, config2, seed, render=render)
+        reward, player1_won = play_against_other(weights1, config1, weights2, config2, seed, render=render)
         if reward:
-            if player == 1:
+            if player1_won:
                 player1_win += 1
             else:
                 player2_win += 1
@@ -257,15 +322,17 @@ def evaluate_against_other(weights1, config1, weights2, config2, n_tests=20, ren
     print(player1_win, player2_win, draw)
 
 
-def play_against_algorithm(weight_file_path, config_name, seed, algo="expert"):
+def play_against_algorithm(weight_file_path, config_name, seed, algo="expert", render=False):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
     game_module = importlib.import_module("games." + config_name)
     config = game_module.MuZeroConfig()
     model = models.MuZeroNetwork(config)
     model.set_weights(torch.load(weight_file_path))
     model.eval()
 
-    if algo == "expert":
-        algo = Expert(-1, 1)
+    algo = globals()[algo.capitalize()](-1, 1)
 
     game = Game(seed)
     observation = game.reset()
@@ -282,7 +349,7 @@ def play_against_algorithm(weight_file_path, config_name, seed, algo="expert"):
     reward = 0
 
     while not done:
-        if game.to_play_real() == 1:
+        if game.to_play_real() == -1:
             action = algo(game.get_state(), depth, game.to_play_real())
         else:
             stacked_observations = game_history.get_stacked_observations(
@@ -305,6 +372,8 @@ def play_against_algorithm(weight_file_path, config_name, seed, algo="expert"):
             game_history.store_search_statistics(root, config.action_space)
             game_history.priorities.append(priority)
         observation, reward, done = game.step(action)
+        if render:
+            game.render()
         depth -= 1
 
         game_history.action_history.append(action)
@@ -313,20 +382,16 @@ def play_against_algorithm(weight_file_path, config_name, seed, algo="expert"):
         game_history.to_play_history.append(game.to_play())
         game_history.legal_actions.append(game.legal_actions())
 
-    return reward, Expert.wins(game.get_state(), 1)
+    return reward, TictactoeComp.wins(game.get_state(), 1)
 
 
-def evaluate_against_algorithm(weights, config, algorithm="expert", n_tests=20):
+def evaluate_against_algorithm(weights, config, algorithm="expert", n_tests=20, render=False, seed=0):
     player1_win = 0
     player2_win = 0
     draw = 0
 
-    pool = Pool()
-
-    for reward, player1_won in tqdm.tqdm(
-            pool.imap(_play_against_algorithm,
-                      zip([weights] * n_tests, [config] * n_tests, np.arange(n_tests), [algorithm] * n_tests)),
-            total=n_tests):
+    if render:
+        reward, player1_won = play_against_algorithm(weights, config, seed, algorithm, render=True)
         if reward:
             if player1_won:
                 player1_win += 1
@@ -334,9 +399,24 @@ def evaluate_against_algorithm(weights, config, algorithm="expert", n_tests=20):
                 player2_win += 1
         else:
             draw += 1
+    else:
+        pool = Pool()
+
+        for reward, player1_won in tqdm.tqdm(
+                pool.imap(_play_against_algorithm,
+                          zip([weights] * n_tests, [config] * n_tests, np.arange(n_tests), [algorithm] * n_tests)),
+                total=n_tests):
+            if reward:
+                if player1_won:
+                    player1_win += 1
+                else:
+                    player2_win += 1
+            else:
+                draw += 1
 
     print(player1_win, player2_win, draw)
 
 
 if __name__ == "__main__":
-    fire.Fire(evaluate_against_algorithm)
+    fire.Fire({"pve": evaluate_against_algorithm,
+               "pvp": evaluate_against_other})
