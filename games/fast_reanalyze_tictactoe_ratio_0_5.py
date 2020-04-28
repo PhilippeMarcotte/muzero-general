@@ -4,6 +4,7 @@ import os
 import gym
 import numpy
 import torch
+import copy
 
 from .abstract_game import AbstractGame
 
@@ -20,7 +21,7 @@ class MuZeroConfig:
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
 
         ### Self-Play
-        self.num_actors = 1  # Number of simultaneous threads self-playing to feed the replay buffer
+        self.num_actors = 3  # Number of simultaneous threads self-playing to feed the replay buffer
         self.max_moves = 9  # Maximum number of moves if game is not finished before
         self.num_simulations = 25  # Number of future moves self-simulated
         self.discount = 1  # Chronological discount of the reward
@@ -59,7 +60,7 @@ class MuZeroConfig:
         self.results_path = os.path.join(os.path.dirname(__file__), "../results", os.path.basename(__file__)[:-3],
                                          datetime.datetime.now().strftime(
                                              "%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
-        self.training_steps = 20000  # Total number of training steps (ie weights update according to a batch)
+        self.training_steps = 40000  # Total number of training steps (ie weights update according to a batch)
         self.batch_size = 128  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for sef-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
@@ -235,7 +236,7 @@ class Game(AbstractGame):
         return "Play row {}, column {}".format(row, col)
 
     def get_state(self):
-        return self.env.board
+        return copy.deepcopy(self.env.board)
 
 
 class TicTacToe:
@@ -261,8 +262,9 @@ class TicTacToe:
         self.board[row, col] = self.player
 
         done = self.is_finished()
-
-        reward = 1 if done and 0 < len(self.legal_actions()) else 0
+        reward = done
+        if not done:
+            done = len(self.legal_actions()) == 0
 
         self.player *= -1
 
@@ -303,10 +305,6 @@ class TicTacToe:
                 and self.board[1, 1] == self.player
                 and self.board[0, 2] == self.player
         ):
-            return True
-
-        # No legal actions means a draw
-        if len(self.legal_actions()) == 0:
             return True
 
         return False
