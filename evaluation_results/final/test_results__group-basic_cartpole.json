@@ -303,7 +303,7 @@
     178.0,
     177.0
   ],
-  "basic_cartpole_75_ratio_2": [
+  "basic_cartpole_75_ratio_2_sim_50": [
     305.0,
     322.0,
     500.0,
@@ -555,7 +555,7 @@
     500.0,
     500.0
   ],
-  "basic_cartpole_75_ratio_1": [
+  "basic_cartpole_75_ratio_1_sim_50": [
     208.0,
     204.0,
     206.0,
@@ -807,7 +807,7 @@
     500.0,
     500.0
   ],
-  "basic_cartpole_75_ratio_0_5": [
+  "basic_cartpole_75_ratio_0_5_sim_50": [
     500.0,
     500.0,
     500.0,

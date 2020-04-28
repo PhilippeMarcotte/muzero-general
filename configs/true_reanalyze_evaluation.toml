@@ -2,5 +2,10 @@ project_name = "rl-project"
 entity = "lap1n"
 num_episodes= 50
 num_workers=10
-run_ids=["3cplek04","3ih50gi5","weviku4e","k6xd6war","2oqi8o9f"]
+run_ids=[
+    "17gfcwrq","26yh6ms8","2d7suiz1","1ogzqnnk","2ybm206b",
+    "o3xxrw55","a24nt4p4","3juz4w0r","ip6ts9nx","2cep2xfd",
+    "2j4ydcnw","25yjwqxo","1q8xyrwx","zx9lo6ws","2zutcsh0",
+    "3cplek04","3ih50gi5","weviku4e","k6xd6war","2oqi8o9f"
+]
 [filters]
