@@ -4,6 +4,7 @@ import os
 import gym
 import numpy
 import torch
+import copy
 
 from .abstract_game import AbstractGame
 
@@ -11,8 +12,6 @@ from .abstract_game import AbstractGame
 class MuZeroConfig:
     def __init__(self):
         self.seed = 0  # Seed for numpy, torch and the game
-
-
 
         ### Game
         self.observation_shape = (3, 3, 3)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
@@ -243,7 +242,7 @@ class Game(AbstractGame):
         return "Play row {}, column {}".format(row, col)
 
     def get_state(self):
-        return self.env.board
+        return copy.deepcopy(self.env.board)
 
 
 class TicTacToe:
@@ -269,8 +268,9 @@ class TicTacToe:
         self.board[row, col] = self.player
 
         done = self.is_finished()
-
-        reward = 1 if done and 0 < len(self.legal_actions()) else 0
+        reward = done
+        if not done:
+            done = len(self.legal_actions()) == 0
 
         self.player *= -1
 
@@ -311,10 +311,6 @@ class TicTacToe:
             and self.board[1, 1] == self.player
             and self.board[0, 2] == self.player
         ):
-            return True
-
-        # No legal actions means a draw
-        if len(self.legal_actions()) == 0:
             return True
 
         return False
