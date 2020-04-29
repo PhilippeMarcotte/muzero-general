@@ -2,9 +2,9 @@ project_name = "rl-project"
 entity = "lap1n"
 num_episodes= 50
 num_workers=10
-run_ids=["4cf4oigp","3eivvc17","7spk8k0r","k5qtj4qu","23a0d2s2",
-        "3xbp5t2q","1w7lvki7","1y7qeof5","2wxp19j7","1ggrgyws",
-        "1g2gbnpv","1zwvl3to","fdm3rdlh","3dg2u633","2qmn6tal",
-        "11rppoi5","34zu5vue","1eouuvl1","accx95qv","1f5g1b4f",
+run_ids=["1f0quoey","1e6j8u4o","153qjoct","18lvaszi","35nozmvj",
+#        "3xbp5t2q","1w7lvki7","1y7qeof5","2wxp19j7","1ggrgyws",
+#        "1g2gbnpv","1zwvl3to","fdm3rdlh","3dg2u633","2qmn6tal",
+#        "11rppoi5","34zu5vue","1eouuvl1","accx95qv","1f5g1b4f",
         ]
 [filters]

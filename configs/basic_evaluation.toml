@@ -2,6 +2,9 @@ project_name = "rl-project"
 entity = "lap1n"
 num_episodes= 50
 num_workers=10
-run_ids=[]
+run_ids=["x748xt64","t4c1xioo","31ha50j6","o676a5tb","3t4tmayr",
+        "2aicy7n6","11o1f70p","3e47gyu1","1j1rzeat","3ty6w4c2",
+        "2eur47ka","pfek9xr7","1t0f3a65","3g1s13xo","2pzrfx2s",
+        "198ncxkm","3fqb98gi","t4q1mgof","2nc0qxe1","1weliwqq",
+        ]
 [filters]
-group = "basic_cartpole"
