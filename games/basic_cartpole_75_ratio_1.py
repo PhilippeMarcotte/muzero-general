@@ -76,8 +76,7 @@ class MuZeroConfig:
 
         # Muzero Reanalyze
         self.policy_update_rate = 0
-        self.num_reanalyze_cpus = 91
-        self.reanalyze_mode = "true"  # or "fast"
+
         ### Replay Buffer
         self.window_size = 75  # Number of self-play games to keep in the replay buffer
         self.num_unroll_steps = 5  # Number of game moves to keep for every batch element

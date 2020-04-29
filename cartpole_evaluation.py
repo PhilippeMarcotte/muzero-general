@@ -63,7 +63,7 @@ class ModelEvaluator:
         return True
 
 
-def evaluation(evaluation_config_path="./configs/fast_reanalyze_evaluation.toml"):
+def evaluation(evaluation_config_path="./configs/evaluation/fast_reanalyze_evaluation.toml"):
     t1 = time.time()
     ray.init()
     config = load_toml(evaluation_config_path)
