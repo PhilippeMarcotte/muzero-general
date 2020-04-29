@@ -63,7 +63,7 @@ class ModelEvaluator:
         return True
 
 
-def evaluation(evaluation_config_path="./configs/reanalyze_evaluation.toml"):
+def evaluation(evaluation_config_path="./configs/evaluation/fast_reanalyze_evaluation.toml"):
     t1 = time.time()
     ray.init()
     config = load_toml(evaluation_config_path)
@@ -87,9 +87,9 @@ def evaluation(evaluation_config_path="./configs/reanalyze_evaluation.toml"):
             env_config_name = os.path.splitext(env_config_file.name)[0]
             # if os.path.exists(os.path.join(ModelEvaluator.CONFIGS_DIR_PATH, env_config_file.name)) is False:
             env_config_file.download(True, root=ModelEvaluator.CONFIGS_DIR_PATH)
-            weight_file_path = os.path.join(ModelEvaluator.WEIGHTS_DIR_PATH, f"{run.id}.weights")
+            weight_file_path = os.path.join(ModelEvaluator.WEIGHTS_DIR_PATH, env_config_name, f"{run.id}.weights")
             if os.path.exists(weight_file_path) is False:
-                pathlib.Path(ModelEvaluator.WEIGHTS_DIR_PATH).mkdir(parents=True, exist_ok=True)
+                pathlib.Path(os.path.dirname(weight_file_path)).mkdir(parents=True, exist_ok=True)
                 weights_file = weights_file_result[0].download(replace=True,
                                                                root=ModelEvaluator.WEIGHTS_DIR_PATH)
                 shutil.move(weights_file.name, weight_file_path)
