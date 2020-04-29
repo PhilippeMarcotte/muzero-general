@@ -1,7 +1,7 @@
 import wandb
 from ray.experimental.queue import Queue
 
-import reanalyze_queue
+import reanalyze
 from utils.logging import Logger
 import copy
 import importlib
@@ -18,7 +18,7 @@ import replay_buffer
 import self_play
 import shared_storage
 import trainer
-import reanalyze
+import fast_reanalyze
 from utils.config import load_toml
 from utils.logging import WandbLogger, TensorboardLogger
 
@@ -92,7 +92,7 @@ class MuZero:
             if self.reanalyze_mode == "true":
                 queue = Queue()
                 for i in range(self.config.num_reanalyze_cpus):
-                    reanalyze_worker = reanalyze_queue.ReanalyzeQueueWorker.remote(
+                    reanalyze_worker = reanalyze.ReanalyzeQueueWorker.remote(
                         copy.deepcopy(self.muzero_weights),
                         shared_storage_worker,
                         replay_buffer_worker,
@@ -101,7 +101,7 @@ class MuZero:
                     )
                     reanalyze_worker.fill_batch_queue.remote()
             else:
-                reanalyze_worker = reanalyze.ReanalyzeWorker.remote(
+                reanalyze_worker = fast_reanalyze.ReanalyzeWorker.remote(
                     copy.deepcopy(self.muzero_weights),
                     shared_storage_worker,
                     replay_buffer_worker,
