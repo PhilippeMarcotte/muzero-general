@@ -11,8 +11,24 @@ The implementation was tested on Cartpole-v1 from OpenAi Gym and the implementat
 python muzero.py --game_name <configuration name> --action "Train" --logger tensorboard --seed <seed>
 ```
 
-The configuration used are located in games. However, only the name is required. Here are all the configurations for the experiments:
+The configuration used are located in the fodler games. However, only the name is required. Here are all the configurations used for the experiments:
 - basic_tictactoe_ratio_0_5
 - true_reanalyze_tictactoe_ratio_0_5
 - fast_reanalyze_tictactoe_ratio_0_5
-_basic_cartpole_75_ratio_0_25_num_sim
+
+- basic_cartpole_75_ratio_0_25 (seed=[0,10,20,30,40])
+- basic_cartpole_75_ratio_0_5 (seed=[0,10,20,30,40])
+- basic_cartpole_75_ratio_1 (seed=[0,10,20,30,40])
+- basic_cartpole_75_ratio_2 (seed=[0,10,20,30,40])
+
+- true_reanalyze_cartpole_75_ratio_0_25 (seed=[0,10,20,50,60])
+- true_reanalyzebasic_cartpole_75_ratio_0_5 (seed=[0,10,20,50,60])
+- true_reanalyze_cartpole_75_ratio_1 (seed=[0,10,20,50,60])
+- true_reanalyze_cartpole_75_ratio_2 (seed=[0,10,20,50,60])
+
+- fast_reanalyze_cartpole_75_ratio_0_25 (seed=[0,10,20,30,40])
+- fast_reanalyze_cartpole_75_ratio_0_5 (seed=[0,10,20,30,40])
+- fast_reanalyze_cartpole_75_ratio_1 (seed=[0,10,20,30,40])
+- fast_reanalyze_cartpole_75_ratio_2 (seed=[0,10,20,30,40])
+
+For further information please see the original [README](./README_MuZeroGeneral.md).
