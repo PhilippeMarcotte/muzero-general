@@ -4,7 +4,6 @@ import os
 import gym
 import numpy
 import torch
-import copy
 
 from .abstract_game import AbstractGame
 
@@ -236,7 +235,7 @@ class Game(AbstractGame):
         return "Play row {}, column {}".format(row, col)
 
     def get_state(self):
-        return copy.deepcopy(self.env.board)
+        return self.env.board
 
 
 class TicTacToe:
@@ -262,9 +261,8 @@ class TicTacToe:
         self.board[row, col] = self.player
 
         done = self.is_finished()
-        reward = done
-        if not done:
-            done = len(self.legal_actions()) == 0
+
+        reward = 1 if done and 0 < len(self.legal_actions()) else 0
 
         self.player *= -1
 
@@ -305,6 +303,10 @@ class TicTacToe:
                 and self.board[1, 1] == self.player
                 and self.board[0, 2] == self.player
         ):
+            return True
+
+        # No legal actions means a draw
+        if len(self.legal_actions()) == 0:
             return True
 
         return False
