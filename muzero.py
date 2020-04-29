@@ -89,7 +89,15 @@ class MuZero:
         )
         queue = None
         if self.config.policy_update_rate > 0:
-            if self.reanalyze_mode == "true":
+            if self.config.reanalyze_mode == "fast":
+                reanalyze_worker = fast_reanalyze.ReanalyzeWorker.remote(
+                    copy.deepcopy(self.muzero_weights),
+                    shared_storage_worker,
+                    replay_buffer_worker,
+                    self.config
+                )
+                reanalyze_worker.update_policies.remote()
+            else:
                 queue = Queue()
                 for i in range(self.config.num_reanalyze_cpus):
                     reanalyze_worker = reanalyze.ReanalyzeQueueWorker.remote(
@@ -100,14 +108,6 @@ class MuZero:
                         queue
                     )
                     reanalyze_worker.fill_batch_queue.remote()
-            else:
-                reanalyze_worker = fast_reanalyze.ReanalyzeWorker.remote(
-                    copy.deepcopy(self.muzero_weights),
-                    shared_storage_worker,
-                    replay_buffer_worker,
-                    self.config
-                )
-                reanalyze_worker.update_policies.remote()
         # Launch workers
         [
             self_play_worker.continuous_self_play.remote(

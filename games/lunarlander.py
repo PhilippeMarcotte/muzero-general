@@ -81,7 +81,8 @@ class MuZeroConfig:
 
         # Muzero Reanalyze
         self.policy_update_rate = 0.8
-
+        self.reanalyze_mode = "true"  # or "fast"
+        self.num_reanalyze_cpus = 27
 
         ### Replay Buffer
         self.window_size = 1000  # Number of self-play games to keep in the replay buffer
