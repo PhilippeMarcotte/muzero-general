@@ -39,4 +39,9 @@ The configuration used are located in the [games](./games) fodler. However, only
 - fast_reanalyze_cartpole_75_ratio_1 (seed=[0,10,20,30,40])
 - fast_reanalyze_cartpole_75_ratio_2 (seed=[0,10,20,30,40])
 
+### Example
+```shell script
+python muzero.py --game_name basic_cartpole_75_ratio_0_25 --action "Train" --logger tensorboard --seed 0
+```
+
 For further information please see the original [README](./README_MuZeroGeneral.md).
