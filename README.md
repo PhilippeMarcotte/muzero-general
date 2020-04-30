@@ -6,6 +6,14 @@ The implementation was tested on Cartpole-v1 from OpenAi Gym and the implementat
 - A synchronous one that uses multiple worker to push batches on a queue while updating the target values and policies. The trainer process pulls one batch at a time for training. This implementation stays true to the original descirption in Appendix H of the [original MuZero paper](https://arxiv.org/abs/1911.08265).
 - A completely asynchronous one that updates samples directly in the replay buffer. This is much faster but does not faithfully reproduce the process described in the original paper.
 
+## Installation
+```shell script
+git clone https://github.com/PhilippeMarcotte/muzero-general.git
+cd muzero-general
+
+pip install -r requirements.txt
+```
+
 ## Command for reproducing the results
 ```shell script
 python muzero.py --game_name <configuration name> --action "Train" --logger tensorboard --seed <seed>
