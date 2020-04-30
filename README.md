@@ -19,7 +19,7 @@ pip install -r requirements.txt
 python muzero.py --game_name <configuration name> --action "Train" --logger tensorboard --seed <seed>
 ```
 
-The configuration used are located in the fodler games. However, only the name is required. Here are all the configurations used for the experiments:
+The configuration used are located in the [games](./games) fodler. However, only the name is required. Here are all the configurations used for the experiments:
 - basic_tictactoe_ratio_0_5
 - true_reanalyze_tictactoe_ratio_0_5
 - fast_reanalyze_tictactoe_ratio_0_5
